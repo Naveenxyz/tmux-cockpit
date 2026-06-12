@@ -16,6 +16,7 @@ case "$target" in
 esac
 
 lines="${FZF_PREVIEW_LINES:-40}"
+cols="${FZF_PREVIEW_COLUMNS:-80}"
 
 while :; do
   info="$(tmux display-message -p -t "$pane" \
@@ -29,21 +30,34 @@ while :; do
   printf '\033[1m%s\033[0m\n\033[2m%s\033[0m\n\n' \
     "${info%%$'\t'*}" "$(display_path "${info#*$'\t'}")"
 
-  # The pane's visible screen, colors preserved. Agent TUIs anchor with
-  # large blank regions (pi pins its footer to the bottom of the pane,
-  # codex leaves everything below its content empty), which would fill
-  # the preview with blank rows and push the conversation out of frame.
-  # Squeeze runs of blank lines to one (ignoring color codes when judging
-  # blankness), then bottom-align what's left.
+  # The pane's visible screen, colors preserved, reframed for the
+  # preview window:
+  #  - Squeeze runs of blank lines to one (ignoring color codes when
+  #    judging blankness): agent TUIs anchor with large blank regions
+  #    (pi pins its footer to the pane bottom, codex leaves everything
+  #    below its content empty) that would push the conversation out
+  #    of frame.
+  #  - Lines wider than the preview get their interior space-gaps
+  #    squeezed (preserving indentation), so right-aligned footer text
+  #    (e.g. pi's model/stats) is pulled back into view instead of
+  #    being truncated off-screen. Fitting lines pass through intact.
   tmux capture-pane -ep -t "$pane" 2>/dev/null \
-    | awk -v esc="$(printf '\033')" '
+    | awk -v esc="$(printf '\033')" -v cols="$cols" '
         {
           plain = $0
           gsub(esc "\\[[0-9;]*m", "", plain)
           if (plain ~ /^[[:space:]]*$/) { if (started) pending = 1; next }
           if (pending) { print ""; pending = 0 }
           started = 1
-          print
+          if (length(plain) > cols) {
+            match($0, /^ */)
+            indent = substr($0, 1, RLENGTH)
+            rest = substr($0, RLENGTH + 1)
+            gsub(/   +/, "  ", rest)
+            print indent rest
+          } else {
+            print
+          }
         }
       ' \
     | tail -n "$((lines - 4))"
