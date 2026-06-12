@@ -28,4 +28,42 @@ chmod +x "$TMPDIR_T/bin/tmux"
 out="$(PATH="$TMPDIR_T/bin:$PATH" "$ROOT/scripts/agent-list.sh")"
 [ -z "$out" ] || { printf 'not ok - agent-list without panes should emit nothing\n' >&2; exit 1; }
 
+# Process-tree detection, with stubbed tmux + ps:
+#   pane %1 pid 100 — the agent IS the pane root (tmux new-window pi)
+#   pane %2 pid 200 — agent one level down  (zsh -> claude)
+#   pane %3 pid 300 — plain shell, no agent
+cat >"$TMPDIR_T/bin/tmux" <<'STUB'
+#!/usr/bin/env bash
+case "$1" in
+  list-panes)
+    printf '%%1\t100\tproj\t1\tpi\t00\n'
+    printf '%%2\t200\tproj\t2\tclaude\t00\n'
+    printf '%%3\t300\tproj\t3\tzsh\t00\n'
+    ;;
+  display-message) printf 'other\n' ;;
+esac
+exit 0
+STUB
+cat >"$TMPDIR_T/bin/ps" <<'STUB'
+#!/usr/bin/env bash
+printf '  100     1 pi\n'
+printf '  200     1 zsh\n'
+printf '  201   200 claude\n'
+printf '  300     1 zsh\n'
+STUB
+chmod +x "$TMPDIR_T/bin/tmux" "$TMPDIR_T/bin/ps"
+
+out="$(PATH="$TMPDIR_T/bin:$PATH" "$ROOT/scripts/agent-list.sh")"
+case "$out" in
+  *'A:%1'*) ;;
+  *) printf 'not ok - agent as pane root process is detected\nOutput:\n%s\n' "$out" >&2; exit 1 ;;
+esac
+case "$out" in
+  *'A:%2'*) ;;
+  *) printf 'not ok - agent below a shell is detected\nOutput:\n%s\n' "$out" >&2; exit 1 ;;
+esac
+case "$out" in
+  *'A:%3'*) printf 'not ok - plain shell pane must not be listed\nOutput:\n%s\n' "$out" >&2; exit 1 ;;
+esac
+
 printf 'ok - agents\n'

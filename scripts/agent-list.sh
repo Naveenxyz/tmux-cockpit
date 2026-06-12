@@ -76,13 +76,14 @@ matches="$(ps -axo pid=,ppid=,comm= | awk -v pids="$pane_pids" -v map="$proc_map
     }
     m = split(pids, roots, " ")
     for (i = 1; i <= m; i++) {
-      # BFS, depth-limited: agents sit one or two levels below the pane
-      # process (shell -> launcher -> agent).
+      # BFS from the pane root (included: `tmux new-window claude` makes
+      # the agent the root itself), depth-limited — agents otherwise sit
+      # one or two levels down (shell -> launcher -> agent).
       head = 1; tail = 1; queue[1] = roots[i]; depth[roots[i]] = 0
       found = ""
       while (head <= tail && found == "") {
         cur = queue[head]; head++
-        if (depth[cur] > 0 && name[cur] in agent_of) {
+        if (name[cur] in agent_of) {
           found = agent_of[name[cur]]
           break
         }
