@@ -23,6 +23,12 @@ directory.
   named and running its command in the project root, plus an extra
   plain-shell window (auto-named by tmux). Unset (the default), new sessions are a single plain
   window — the standard tmux experience.
+- **`prefix + t`** — scratch terminal in a popup, backed by a persistent
+  session (close and reopen, your shell is still there). Starts in `$HOME`
+  by default; press the key again inside to close.
+- **`prefix + g`** — [lazygit](https://github.com/jesseduffield/lazygit) in
+  a popup, opened at the git root of whatever directory the current pane is
+  in. (Requires lazygit; the binding just won't do anything without it.)
 - **`cockpit` CLI (the `zt` workflow)** — works from any terminal, inside
   or outside tmux (it starts the server if needed):
   - `cockpit` — open the fuzzy picker
@@ -78,6 +84,20 @@ All options are optional; set them in `~/.tmux.conf` before the plugin line.
 ```tmux
 # Keys
 set -g @cockpit-popup-key 'o'            # prefix + key for the popup picker
+
+# Scratch terminal popup (prefix + t)
+set -g @cockpit-scratch 'on'             # 'off' to disable the binding
+set -g @cockpit-scratch-key 't'
+set -g @cockpit-scratch-dir '~'          # start directory
+set -g @cockpit-scratch-session 'scratch' # backing session name
+set -g @cockpit-scratch-width '80%'
+set -g @cockpit-scratch-height '80%'
+
+# lazygit popup at the current repo root (prefix + g)
+set -g @cockpit-lazygit 'on'             # 'off' to disable the binding
+set -g @cockpit-lazygit-key 'g'
+set -g @cockpit-lazygit-width '90%'
+set -g @cockpit-lazygit-height '90%'
 
 # Auto commands for new project sessions (default: unset — plain tmux).
 # Format: command:name;command:name  — one window per entry, plus a final

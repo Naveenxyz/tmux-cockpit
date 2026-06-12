@@ -20,3 +20,15 @@ popup_height="$(get_opt "@cockpit-popup-height" "65%")"
 popup_title="$(get_opt "@cockpit-popup-title" " projects ")"
 
 tmux bind-key "$popup_key" display-popup -w "$popup_width" -h "$popup_height" -T "$popup_title" -E "'$SCRIPTS/picker.sh'"
+
+# Scratch terminal popup (persistent session). Disable: @cockpit-scratch off
+if [ "$(get_opt "@cockpit-scratch" "on")" = "on" ]; then
+  scratch_key="$(get_opt "@cockpit-scratch-key" "t")"
+  tmux bind-key "$scratch_key" run-shell "'$SCRIPTS/scratch-popup.sh'"
+fi
+
+# lazygit popup at the current repo root. Disable: @cockpit-lazygit off
+if [ "$(get_opt "@cockpit-lazygit" "on")" = "on" ]; then
+  lazygit_key="$(get_opt "@cockpit-lazygit-key" "g")"
+  tmux bind-key "$lazygit_key" run-shell "'$SCRIPTS/lazygit-popup.sh'"
+fi
