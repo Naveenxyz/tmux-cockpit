@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Terminal entry point (the old `zt` workflow):
+#   cockpit            — fuzzy-pick a project, open/attach its session
+#   cockpit <query>    — resolve <query> with zoxide and open its session
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
+
+if [ $# -eq 0 ]; then
+  exec "$ROOT/scripts/picker.sh"
+fi
+
+if ! command -v zoxide >/dev/null 2>&1; then
+  echo "cockpit: zoxide is required for query mode (brew install zoxide)" >&2
+  exit 1
+fi
+
+dest="$(zoxide query "$@")" || { echo "cockpit: no match for: $*" >&2; exit 1; }
+exec "$ROOT/scripts/open-project.sh" "$dest"
