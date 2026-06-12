@@ -23,8 +23,8 @@ seen=$'\n'
 mark_seen() { seen="${seen}${1}"$'\n'; }
 is_seen() { [[ "$seen" == *$'\n'"$1"$'\n'* ]]; }
 
-# Emit one entry; the first 9 get a dim index — the picker binds 1-9 (open)
-# and alt-1-9 (peek) to them.
+# Emit one entry; the first 9 get a dim index — the picker binds 1-9 to
+# open them instantly.
 line_no=0
 emit() {
   line_no=$((line_no + 1))

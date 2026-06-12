@@ -13,13 +13,8 @@ directory.
   and open sessions, with a preview showing session windows, git status, and
   a file tree. Pick a directory and it becomes (or switches to) a session.
   The first nine entries are numbered: press `1`-`9` to open one instantly
-  (digits jump, they're never typed into the query). `ctrl-p` peeks at the
-  highlighted entry — a nested client attaches right inside the popup
-  (creating the session, auto-command windows and all, if it doesn't exist
-  yet); detach
-  with `prefix + d` to drop back into the picker. `alt-1`-`9` peeks at the
-  Nth entry (terminals can't transmit ctrl+digit). `ctrl-x` kills a session
-  (attached sessions are protected).
+  (digits jump, they're never typed into the query). `ctrl-x` kills a
+  session (attached sessions are protected).
 - **Session-per-project** — sessions are named after the directory, created
   on demand, and reused on the next visit. Same-named projects in different
   paths get unique names automatically.
@@ -28,8 +23,12 @@ directory.
   named and running its command in the project root, plus an extra
   plain-shell window (auto-named by tmux). Unset (the default), new sessions are a single plain
   window — the standard tmux experience.
-- **`cockpit` CLI** — `cockpit api` jumps straight to the best zoxide match
-  for "api" from any terminal; `cockpit` with no args opens the picker.
+- **`cockpit` CLI (the `zt` workflow)** — works from any terminal, inside
+  or outside tmux (it starts the server if needed):
+  - `cockpit` — open the fuzzy picker
+  - `cockpit .` — session for the current directory
+  - `cockpit path/to/dir` — session for a directory
+  - `cockpit api` — session for the best zoxide match for "api"
 
 ## Requirements
 
@@ -44,7 +43,7 @@ directory.
 With [TPM](https://github.com/tmux-plugins/tpm), add to `~/.tmux.conf`:
 
 ```tmux
-set -g @plugin 'YOUR_GITHUB_USERNAME/tmux-cockpit'
+set -g @plugin 'Naveenxyz/tmux-cockpit'
 ```
 
 Then press `prefix + I`. That's it — no scripts to copy, no shell config to
@@ -53,7 +52,7 @@ edit.
 Manual install:
 
 ```sh
-git clone https://github.com/YOUR_GITHUB_USERNAME/tmux-cockpit ~/.tmux/plugins/tmux-cockpit
+git clone https://github.com/Naveenxyz/tmux-cockpit ~/.tmux/plugins/tmux-cockpit
 ```
 
 ```tmux
@@ -61,11 +60,16 @@ git clone https://github.com/YOUR_GITHUB_USERNAME/tmux-cockpit ~/.tmux/plugins/t
 run-shell ~/.tmux/plugins/tmux-cockpit/cockpit.tmux
 ```
 
-Optional CLI (the `zt` workflow):
+Optional CLI — symlink `bin/cockpit` somewhere on your `PATH`, under any
+name you like (`zt` is a nice short one):
 
 ```sh
 ln -s ~/.tmux/plugins/tmux-cockpit/bin/cockpit /usr/local/bin/cockpit
+ln -s ~/.tmux/plugins/tmux-cockpit/bin/cockpit /usr/local/bin/zt
 ```
+
+Then `zt .`, `zt myproject`, or plain `zt` from any terminal — tmux running
+or not.
 
 ## Configuration
 

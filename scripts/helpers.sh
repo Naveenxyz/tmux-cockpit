@@ -105,28 +105,29 @@ parse_auto_commands() {
 # command, plus one extra plain-shell window (auto-named by tmux). Prints
 # the session name.
 ensure_session_for_path() {
-  local path="$1" session auto pane_id idx cmd name
+  local path="$1" session auto first_pane pane_id idx cmd name
   session="$(resolve_session_for_path "$path")"
 
   if ! session_exists "$session"; then
+    # Create the session before reading any @cockpit-* option: if no tmux
+    # server is running yet (e.g. `cockpit foo` right after boot), options
+    # only exist after the server starts and sources ~/.tmux.conf — which
+    # this new-session triggers.
+    first_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$session" -c "$path")"
+    tmux set-option -t "$session" "@cockpit-root" "$path"
+
     auto="$(get_opt "@cockpit-auto-commands" "")"
     parse_auto_commands "$auto"
-
-    if [ "${#AUTO_CMDS[@]}" -eq 0 ]; then
-      # Plain tmux session — no auto commands, no custom layout.
-      tmux new-session -d -s "$session" -c "$path"
-      tmux set-option -t "$session" "@cockpit-root" "$path"
-      printf '%s' "$session"
-      return 0
-    fi
 
     idx=0
     while [ "$idx" -lt "${#AUTO_CMDS[@]}" ]; do
       cmd="${AUTO_CMDS[$idx]}"
       name="${AUTO_NAMES[$idx]}"
       if [ "$idx" -eq 0 ]; then
-        pane_id="$(tmux new-session -d -P -F '#{pane_id}' -s "$session" -c "$path" -n "$name")"
-        tmux set-option -t "$session" "@cockpit-root" "$path"
+        # Claim the initial window (rename also turns off automatic-rename,
+        # so the name sticks like new-window -n).
+        pane_id="$first_pane"
+        tmux rename-window -t "$pane_id" "$name"
       else
         pane_id="$(tmux new-window -d -P -F '#{pane_id}' -t "=$session:" -c "$path" -n "$name")"
       fi
@@ -138,9 +139,11 @@ ensure_session_for_path() {
       idx=$((idx + 1))
     done
 
-    # Extra plain-shell window. No -n: tmux's automatic-rename keeps the
-    # name tracking whatever runs in it.
-    tmux new-window -d -t "=$session:" -c "$path"
+    # Extra plain-shell window when auto commands were launched. Unnamed:
+    # tmux's automatic-rename keeps the name tracking whatever runs in it.
+    if [ "${#AUTO_CMDS[@]}" -gt 0 ]; then
+      tmux new-window -d -t "=$session:" -c "$path"
+    fi
   fi
 
   printf '%s' "$session"

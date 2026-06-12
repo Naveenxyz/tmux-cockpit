@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# Terminal entry point (the old `zt` workflow):
-#   cockpit            — fuzzy-pick a project, open/attach its session
-#   cockpit <query>    — resolve <query> with zoxide and open its session
+# Terminal entry point (the `zt` workflow). Works inside tmux (switches
+# session) and outside (starts the server if needed and attaches).
+#   cockpit              — fuzzy-pick a project, open/attach its session
+#   cockpit .            — session for the current directory
+#   cockpit <path>       — session for a directory (relative or absolute)
+#   cockpit <query...>   — resolve the query with zoxide and open its session
+# Symlink it as `zt` (or anything else) — the name doesn't matter.
 
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
@@ -13,6 +17,12 @@ ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
 
 if [ $# -eq 0 ]; then
   exec "$ROOT/scripts/picker.sh"
+fi
+
+# A directory argument ('.', 'sub/dir', '/abs/path', '~/x' expanded by the
+# shell) opens directly — no zoxide needed.
+if [ $# -eq 1 ] && [ -d "$1" ]; then
+  exec "$ROOT/scripts/open-project.sh" "$(cd "$1" && pwd)"
 fi
 
 if ! command -v zoxide >/dev/null 2>&1; then
