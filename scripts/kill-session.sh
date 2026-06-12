@@ -16,10 +16,9 @@ fi
 # Killing an attached session teleports its client mid-fzf; refuse rather
 # than surprise. (Checking attachment beats comparing against "the current
 # session", which is ambiguous outside a pane context.)
-attached="$(tmux list-sessions -f "#{==:#{session_name},$session}" \
-  -F '#{?session_attached,1,0}' 2>/dev/null | head -1)"
+attached="$(tmux display-message -p -t "=$session" '#{?session_attached,1,0}' 2>/dev/null)"
 if [ "$attached" = "1" ]; then
-  tmux display-message "cockpit: won't kill attached session $session — detach first"
+  cockpit_error "won't kill attached session $session — detach first"
   exit 0
 fi
 

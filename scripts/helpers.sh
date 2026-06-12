@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Shared helpers for tmux-cockpit. Sourced by every script.
 
+# Used by scripts that source helpers.sh.
+# shellcheck disable=SC2034
 COCKPIT_SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 get_opt() {
@@ -10,9 +12,14 @@ get_opt() {
 }
 
 # tmux session names cannot contain '.' or ':' — sanitize a directory
-# basename into a valid session name.
+# basename into a valid, target-friendly session name.
 session_name_for() {
-  basename "$1" | tr '.: ' '___'
+  local base name
+  base="$(basename "$1")"
+  [ "$base" = "/" ] && base="root"
+  name="$(printf '%s' "$base" | tr '.: /' '____')"
+  [ -n "$name" ] || name="root"
+  printf '%s' "$name"
 }
 
 session_exists() {
@@ -195,9 +202,17 @@ parse_target() {
   esac
 }
 
+cockpit_error() {
+  if [ -n "${TMUX:-}" ] && command -v tmux >/dev/null 2>&1; then
+    tmux display-message "tmux-cockpit: $*" 2>/dev/null || printf 'tmux-cockpit: %s\n' "$*" >&2
+  else
+    printf 'tmux-cockpit: %s\n' "$*" >&2
+  fi
+}
+
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
-    tmux display-message "tmux-cockpit: '$1' is required — $2"
+    cockpit_error "'$1' is required — $2"
     exit 1
   fi
 }
@@ -205,7 +220,8 @@ require_cmd() {
 # bash 3.2 mangles ${var/#$HOME/\~}, so shorten $HOME the portable way.
 display_path() {
   case "$1" in
-    "$HOME"*) printf '~%s' "${1#"$HOME"}" ;;
+    "$HOME") printf '~' ;;
+    "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;;
     *) printf '%s' "$1" ;;
   esac
 }

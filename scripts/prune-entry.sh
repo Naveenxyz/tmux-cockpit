@@ -11,5 +11,5 @@ parse_target "$1"
 [ "$TARGET_KIND" = "dir" ] || exit 0
 command -v zoxide >/dev/null 2>&1 || exit 0
 
-zoxide remove "$TARGET_VALUE" 2>/dev/null
+zoxide remove -- "$TARGET_VALUE" 2>/dev/null
 exit 0

@@ -15,11 +15,11 @@ parse_target "$1"
 if [ "$TARGET_KIND" = "session" ]; then
   session="$TARGET_VALUE"
   if ! session_exists "$session"; then
-    tmux display-message "tmux-cockpit: no such session: $session"
+    cockpit_error "no such session: $session"
     exit 1
   fi
   root="$(session_path_of "$session")"
-  [ -n "$root" ] && command -v zoxide >/dev/null 2>&1 && zoxide add "$root"
+  [ -n "$root" ] && command -v zoxide >/dev/null 2>&1 && zoxide add -- "$root"
   if [ -n "$TMUX" ]; then
     exec tmux switch-client -t "=$session"
   else
@@ -29,13 +29,13 @@ fi
 
 path="$TARGET_VALUE"
 if [ -z "$path" ] || [ ! -d "$path" ]; then
-  tmux display-message "tmux-cockpit: not a directory: $path"
+  cockpit_error "not a directory: $path"
   exit 1
 fi
-path="$(cd "$path" && pwd)"
+path="$(cd "$path" && pwd)" || exit 1
 
 # Keep zoxide's frecency fresh so the project ranks higher next time.
-command -v zoxide >/dev/null 2>&1 && zoxide add "$path"
+command -v zoxide >/dev/null 2>&1 && zoxide add -- "$path"
 
 session="$(ensure_session_for_path "$path")"
 

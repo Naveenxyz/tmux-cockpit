@@ -140,6 +140,18 @@ set -g @cockpit-auto-commands 'claude;"npm run dev":dev;codex'
   window per `@cockpit-auto-commands` entry plus a plain shell), bumps zoxide,
   and switches/attaches.
 
+## Development
+
+Run the local checks with:
+
+```sh
+tests/run.sh
+```
+
+The test suite covers the auto-command parser, session-name collision
+resolution, project-list deduping, and a small isolated tmux smoke test.
+CI also runs `bash -n` and ShellCheck.
+
 ## Known limitations
 
 - **Same-name sessions you created by hand are trusted.** Opening

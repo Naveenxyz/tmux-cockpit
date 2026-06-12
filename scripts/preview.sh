@@ -19,8 +19,7 @@ fi
 printf '\033[1m%s\033[0m\n' "$(display_path "$path")"
 
 if [ -n "$session" ] && session_exists "$session"; then
-  attached="$(tmux list-sessions -f "#{==:#{session_name},$session}" \
-    -F '#{?session_attached,attached,detached}' 2>/dev/null | head -1)"
+  attached="$(tmux display-message -p -t "=$session" '#{?session_attached,attached,detached}' 2>/dev/null)"
   printf '\n\033[32m● session %s (%s)\033[0m\n' "$session" "$attached"
   tmux list-windows -t "=$session" -F '  #{window_index}: #{window_name}#{?window_active, *,}' 2>/dev/null
 fi
@@ -38,5 +37,7 @@ if command -v eza >/dev/null 2>&1; then
 elif command -v tree >/dev/null 2>&1; then
   tree -L 2 -C "$path" | head -40
 else
+  # ls is fine for a human-readable preview pane.
+  # shellcheck disable=SC2012
   ls -la "$path" | head -40
 fi

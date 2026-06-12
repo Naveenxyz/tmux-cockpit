@@ -13,6 +13,12 @@ start_dir="${start_dir/#\~/$HOME}"
 width="$(get_opt "@cockpit-scratch-width" "80%")"
 height="$(get_opt "@cockpit-scratch-height" "80%")"
 
+if [ ! -d "$start_dir" ]; then
+  cockpit_error "scratch directory does not exist: $start_dir"
+  exit 1
+fi
+start_dir="$(cd "$start_dir" && pwd)" || exit 1
+
 # Inside the scratch popup already? Toggle it closed.
 if [ "$(current_session)" = "$session" ]; then
   exec tmux detach-client

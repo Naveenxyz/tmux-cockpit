@@ -39,13 +39,16 @@ emit() {
 # $(...) command substitution forks a subshell per call, which adds up
 # over hundreds of zoxide entries.
 fast_session_name() {
-  SN="${1##*/}"
-  SN="${SN//./_}"; SN="${SN//:/_}"; SN="${SN// /_}"
+  SN="${1%/}"
+  SN="${SN##*/}"
+  [ -n "$SN" ] || SN="root"
+  SN="${SN//./_}"; SN="${SN//:/_}"; SN="${SN// /_}"; SN="${SN//\//_}"
 }
 
 fast_display_path() {
   case "$1" in
-    "$HOME"*) DP="~${1#"$HOME"}" ;;
+    "$HOME") DP="~" ;;
+    "$HOME"/*) DP="~${1#"$HOME"}" ;;
     *) DP="$1" ;;
   esac
 }

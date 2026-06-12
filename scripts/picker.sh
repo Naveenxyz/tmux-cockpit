@@ -21,7 +21,8 @@ done
 # this tmux option is the way to theme the picker.
 extra_opts=()
 fzf_opts="$(get_opt "@cockpit-fzf-opts" "")"
-# shellcheck disable=SC2206 — intentional word splitting
+# Intentional word splitting into an array.
+# shellcheck disable=SC2206
 [ -n "$fzf_opts" ] && extra_opts=($fzf_opts)
 
 selection="$("$COCKPIT_SCRIPTS/project-list.sh" | fzf \
