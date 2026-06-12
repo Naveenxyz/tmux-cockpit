@@ -3,6 +3,7 @@
 # session) and outside (starts the server if needed and attaches).
 #   cockpit              — fuzzy-pick a project, open/attach its session
 #   cockpit .            — session for the current directory
+#   cockpit -            — back to the previous session (like cd -)
 #   cockpit <path>       — session for a directory (relative or absolute)
 #   cockpit <query...>   — resolve the query with zoxide and open its session
 # Symlink it as `zt` (or anything else) — the name doesn't matter.
@@ -17,6 +18,16 @@ ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
 
 if [ $# -eq 0 ]; then
   exec "$ROOT/scripts/picker.sh"
+fi
+
+# 'zt -' — previous session, like cd -. Outside tmux, plain attach already
+# picks the most recently active session.
+if [ "$1" = "-" ]; then
+  if [ -n "$TMUX" ]; then
+    exec tmux switch-client -l
+  else
+    exec tmux attach-session
+  fi
 fi
 
 # A directory argument ('.', 'sub/dir', '/abs/path', '~/x' expanded by the

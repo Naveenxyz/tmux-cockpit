@@ -3,7 +3,8 @@
 # directly from a terminal via bin/cockpit.
 #
 # Keys: enter/click opens, 1-9 jump straight to the Nth entry (digits are
-# never typed into the query), ctrl-x kills a session.
+# never typed into the query), ctrl-x kills a session, ctrl-d prunes a
+# directory entry from zoxide.
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/helpers.sh"
 
@@ -30,10 +31,11 @@ selection="$("$COCKPIT_SCRIPTS/project-list.sh" | fzf \
   --with-nth=2 \
   --layout=reverse \
   --prompt='project ❯ ' \
-  --header='enter/1-9: open · ctrl-x: kill session · esc: cancel' \
+  --header='enter/1-9: open · ctrl-x: kill session · ctrl-d: prune dir · esc: cancel' \
   --bind 'left-click:accept' \
   "${digit_binds[@]}" \
   --bind "ctrl-x:execute-silent('$COCKPIT_SCRIPTS/kill-session.sh' {1})+reload('$COCKPIT_SCRIPTS/project-list.sh')" \
+  --bind "ctrl-d:execute-silent('$COCKPIT_SCRIPTS/prune-entry.sh' {1})+reload('$COCKPIT_SCRIPTS/project-list.sh')" \
   --preview "'$COCKPIT_SCRIPTS/preview.sh' {1}" \
   --preview-window 'right,55%,border-left')"
 

@@ -14,7 +14,8 @@ directory.
   a file tree. Pick a directory and it becomes (or switches to) a session.
   The first nine entries are numbered: press `1`-`9` to open one instantly
   (digits jump, they're never typed into the query). `ctrl-x` kills a
-  session (attached sessions are protected).
+  session (attached sessions are protected). `ctrl-d` prunes a directory
+  from zoxide's history, keeping the list clean.
 - **Session-per-project** — sessions are named after the directory, created
   on demand, and reused on the next visit. Same-named projects in different
   paths get unique names automatically.
@@ -33,6 +34,7 @@ directory.
   or outside tmux (it starts the server if needed):
   - `cockpit` — open the fuzzy picker
   - `cockpit .` — session for the current directory
+  - `cockpit -` — back to the previous session, like `cd -`
   - `cockpit path/to/dir` — session for a directory
   - `cockpit api` — session for the best zoxide match for "api"
 
@@ -84,6 +86,9 @@ All options are optional; set them in `~/.tmux.conf` before the plugin line.
 ```tmux
 # Keys
 set -g @cockpit-popup-key 'o'            # prefix + key for the popup picker
+set -g @cockpit-last-key ''              # prefix + key for previous session
+                                         # (off by default — e.g. 'p' collides
+                                         # with stock previous-window)
 
 # Scratch terminal popup (prefix + t)
 set -g @cockpit-scratch 'on'             # 'off' to disable the binding

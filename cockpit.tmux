@@ -32,3 +32,11 @@ if [ "$(get_opt "@cockpit-lazygit" "on")" = "on" ]; then
   lazygit_key="$(get_opt "@cockpit-lazygit-key" "g")"
   tmux bind-key "$lazygit_key" run-shell "'$SCRIPTS/lazygit-popup.sh'"
 fi
+
+# Previous-session key (like cd -). Off by default: most candidate keys
+# (e.g. 'p' = previous-window) collide with stock tmux bindings, so users
+# opt in: set -g @cockpit-last-key 'p'
+last_key="$(get_opt "@cockpit-last-key" "")"
+if [ -n "$last_key" ]; then
+  tmux bind-key "$last_key" switch-client -l
+fi
