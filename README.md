@@ -24,6 +24,16 @@ directory.
   named and running its command in the project root, plus an extra
   plain-shell window (auto-named by tmux). Unset (the default), new sessions are a single plain
   window — the standard tmux experience.
+- **`prefix + a`** — agent popup. Every AI-agent pane across all your
+  sessions in one list, ordered by project — Claude Code, Codex,
+  OpenCode, and pi out of the box. The preview is the selected pane's
+  live screen, auto-refreshing every second, so you can watch an agent
+  work without leaving the popup. `enter`/`1`-`9` jumps straight to the
+  pane, `ctrl-r` reloads the list. `prefix + A` is the same picker
+  scoped to the current session. Detection is purely observational
+  (process tree) — no agent-side hooks or config to install. Agents are
+  pluggable: drop a module in `scripts/agents/` (see `agents/claude.sh`)
+  and add its name to `@cockpit-agents`.
 - **`prefix + t`** — scratch terminal in a popup, backed by a persistent
   session (close and reopen, your shell is still there). Starts in `$HOME`
   by default; press the key again inside to close.
@@ -90,6 +100,14 @@ set -g @cockpit-last-key ''              # prefix + key for previous session
                                          # (off by default — e.g. 'p' collides
                                          # with stock previous-window)
 
+# Agent popup (prefix + a all sessions, prefix + A current session)
+set -g @cockpit-agents-popup 'on'        # 'off' to disable the bindings
+set -g @cockpit-agents-key 'a'
+set -g @cockpit-agents-current-key 'A'
+set -g @cockpit-agents 'claude codex opencode pi'  # modules to load from scripts/agents/
+set -g @cockpit-agents-width '75%'       # defaults to @cockpit-popup-width
+set -g @cockpit-agents-height '65%'      # defaults to @cockpit-popup-height
+
 # Scratch terminal popup (prefix + t)
 set -g @cockpit-scratch 'on'             # 'off' to disable the binding
 set -g @cockpit-scratch-key 't'
@@ -139,6 +157,13 @@ set -g @cockpit-auto-commands 'claude;"npm run dev":dev;codex'
   `@cockpit-root` session option), creates the session if needed (one
   window per `@cockpit-auto-commands` entry plus a plain shell), bumps zoxide,
   and switches/attaches.
+- `scripts/agent-list.sh` finds agent panes by walking each pane's process
+  tree (one `ps` snapshot, one awk pass — `#{pane_current_command}` lies:
+  Claude's launcher renames itself, pi shows up as `node`). A
+  `scripts/agents/<name>.sh` module is one definition: `<name>_procs`,
+  the process names that claim a pane for that agent. The picker's
+  preview loops `capture-pane -e` once a second, clearing with `ESC[2J`
+  (fzf renders that as a watch-style live preview).
 
 ## Development
 
@@ -149,8 +174,8 @@ tests/run.sh
 ```
 
 The test suite covers the auto-command parser, session-name collision
-resolution, project-list deduping, and a small isolated tmux smoke test.
-CI also runs `bash -n` and ShellCheck.
+resolution, project-list deduping, the agent module interface, and a
+small isolated tmux smoke test. CI also runs `bash -n` and ShellCheck.
 
 ## Known limitations
 
