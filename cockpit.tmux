@@ -17,4 +17,6 @@ popup_key="$(get_opt "@cockpit-popup-key" "o")"
 popup_width="$(get_opt "@cockpit-popup-width" "75%")"
 popup_height="$(get_opt "@cockpit-popup-height" "65%")"
 
-tmux bind-key "$popup_key" display-popup -w "$popup_width" -h "$popup_height" -E "'$SCRIPTS/picker.sh'"
+popup_title="$(get_opt "@cockpit-popup-title" " projects ")"
+
+tmux bind-key "$popup_key" display-popup -w "$popup_width" -h "$popup_height" -T "$popup_title" -E "'$SCRIPTS/picker.sh'"

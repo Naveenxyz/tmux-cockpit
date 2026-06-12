@@ -15,7 +15,16 @@ for i in 1 2 3 4 5 6 7 8 9; do
   digit_binds+=(--bind "$i:pos($i)+accept")
 done
 
+# Extra space-separated fzf flags (e.g. a --color theme). FZF_DEFAULT_OPTS
+# doesn't reach the popup (tmux spawns it outside the user's shell), so
+# this tmux option is the way to theme the picker.
+extra_opts=()
+fzf_opts="$(get_opt "@cockpit-fzf-opts" "")"
+# shellcheck disable=SC2206 — intentional word splitting
+[ -n "$fzf_opts" ] && extra_opts=($fzf_opts)
+
 selection="$("$COCKPIT_SCRIPTS/project-list.sh" | fzf \
+  "${extra_opts[@]}" \
   --ansi \
   --delimiter=$'\t' \
   --with-nth=2 \
