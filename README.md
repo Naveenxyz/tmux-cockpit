@@ -85,9 +85,13 @@ set -g @cockpit-popup-key 'o'            # prefix + key for the popup picker
 # word). Quote a command with '' or "" if it contains ':' or ';'.
 set -g @cockpit-auto-commands 'claude:claude;pi:pi'
 
-# Popup size
+# Popup size and looks
 set -g @cockpit-popup-width '75%'
 set -g @cockpit-popup-height '65%'
+set -g @cockpit-popup-title ' projects '
+# Extra fzf flags for the picker, e.g. a --color theme (FZF_DEFAULT_OPTS
+# doesn't reach tmux popups, so theme the picker here instead)
+set -g @cockpit-fzf-opts '--color=bg+:#283457,hl:#7aa2f7'
 
 # Extra project sources (colon-separated; each dir's children are offered).
 # Useful without zoxide, or for dirs you haven't visited yet.
