@@ -31,6 +31,14 @@ session_name_for() {
   sanitize_session_component "$base"
 }
 
+expand_home_path() {
+  case "$1" in
+    ~) printf '%s' "$HOME" ;;
+    ~/*) printf '%s/%s' "$HOME" "${1#~/}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 # Print readable session-name candidates for <path>, from least to most
 # specific. For /Users/me/work/api:
 #   api
@@ -38,9 +46,11 @@ session_name_for() {
 #   me/work/api
 #   Users/me/work/api
 # Numeric suffixes are only a last resort; parent context is more readable
-# for same-named repos and worktrees.
+# for same-named repos and worktrees. Paths under @cockpit-worktrees-dir
+# start at repo/branch (not just branch), so worktree sessions are easy to
+# trace back to their repo.
 session_name_candidates_for_path() {
-  local path="$1" rel part name rest
+  local path="$1" rel part name rest worktrees_dir under_worktrees
   path="${path%/}"
   [ -n "$path" ] || path="/"
 
@@ -48,6 +58,13 @@ session_name_candidates_for_path() {
     printf 'root\n'
     return 0
   fi
+
+  worktrees_dir="$(expand_home_path "$(get_opt "@cockpit-worktrees-dir" "$HOME/worktrees")")"
+  worktrees_dir="${worktrees_dir%/}"
+  under_worktrees=""
+  case "$path" in
+    "$worktrees_dir"/*/*) under_worktrees=1 ;;
+  esac
 
   rel="${path#/}"
   name=""
@@ -58,7 +75,9 @@ session_name_candidates_for_path() {
     else
       name="$(sanitize_session_component "$part")"
     fi
-    printf '%s\n' "$name"
+    if [ -z "$under_worktrees" ] || [[ "$name" == */* ]]; then
+      printf '%s\n' "$name"
+    fi
     [ "$rel" = "$part" ] && break
     rest="${rel%/*}"
     [ "$rest" = "$rel" ] && break

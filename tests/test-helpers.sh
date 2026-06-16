@@ -51,6 +51,7 @@ assert_eq "my_project" "$(session_name_for "/tmp/my:project")" "session name rep
 assert_eq "my_project" "$(session_name_for "/tmp/my project")" "session name replaces spaces"
 assert_eq "root" "$(session_name_for "/")" "session name for filesystem root"
 assert_eq $'api\ntmp/api' "$(session_name_candidates_for_path "/tmp/api")" "session candidates add parent context"
+assert_eq $'repo/feature\nworktrees/repo/feature\ncockpit-home/worktrees/repo/feature\ntmp/cockpit-home/worktrees/repo/feature' "$(session_name_candidates_for_path "/tmp/cockpit-home/worktrees/repo/feature")" "worktree session candidates include repo context first"
 
 session_exists() {
   case "$1" in

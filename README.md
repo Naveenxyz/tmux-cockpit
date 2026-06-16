@@ -166,7 +166,9 @@ set -g @cockpit-auto-commands 'claude;"npm run dev":dev;codex'
 - `scripts/worktree-picker.sh` lists `git worktree list` for the selected
   repo and can create a new worktree under `@cockpit-worktrees-dir`. Default
   paths are grouped by repo name and protected by a repo marker/hash so the
-  same branch name in multiple repos cannot collide silently.
+  same branch name in multiple repos cannot collide silently. Sessions for
+  paths under the worktrees directory are named with repo context first
+  (`repo/branch`) rather than just `branch`.
 - `scripts/agent-list.sh` finds agent panes by walking each pane's process
   tree (one `ps` snapshot, one awk pass — `#{pane_current_command}` lies:
   Claude's launcher renames itself, pi shows up as `node`). A
