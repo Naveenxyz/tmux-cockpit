@@ -13,9 +13,12 @@ directory.
   and open sessions, with a preview showing session windows, git status, and
   a file tree. Pick a directory and it becomes (or switches to) a session.
   The first nine entries are numbered: press `1`-`9` to open one instantly
-  (digits jump, they're never typed into the query). `ctrl-x` kills a
-  session (attached sessions are protected). `ctrl-d` prunes a directory
-  from zoxide's history, keeping the list clean.
+  (digits jump, they're never typed into the query). Type a real path
+  (`~/Desktop/app`, `../repo`, `work/api`) and press enter to open it even
+  if zoxide has never seen it. `ctrl-w` opens the git worktree picker for
+  the selected repo, `ctrl-x` kills a session (attached sessions are
+  protected), and `ctrl-d` prunes a directory from zoxide's history,
+  keeping the list clean.
 - **Session-per-project** — sessions are named after the directory, created
   on demand, and reused on the next visit. Same-named projects in different
   paths get unique names automatically.
@@ -122,6 +125,9 @@ set -g @cockpit-lazygit-key 'g'
 set -g @cockpit-lazygit-width '90%'
 set -g @cockpit-lazygit-height '90%'
 
+# Git worktrees (from the project picker: ctrl-w)
+set -g @cockpit-worktrees-dir '~/worktrees' # default create location
+
 # Auto commands for new project sessions (default: unset — plain tmux).
 # Format: command:name;command:name  — one window per entry, plus a final
 # plain-shell window. The name is optional (defaults to the command's first
@@ -152,11 +158,15 @@ set -g @cockpit-auto-commands 'claude;"npm run dev":dev;codex'
 
 - `scripts/project-list.sh` merges open tmux sessions with `zoxide query -l`
   (deduped by path, frecency order).
-- `scripts/open-project.sh` resolves a directory to a session name
-  (basename, sanitized; suffixed on collisions, tracked via the
-  `@cockpit-root` session option), creates the session if needed (one
-  window per `@cockpit-auto-commands` entry plus a plain shell), bumps zoxide,
-  and switches/attaches.
+- `scripts/open-project.sh` resolves a directory to a readable session name
+  (basename first, then parent/name, grandparent/parent/name, and only then
+  numeric suffixes), tracked via the `@cockpit-root` session option. It
+  creates the session if needed (one window per `@cockpit-auto-commands`
+  entry plus a plain shell), bumps zoxide, and switches/attaches.
+- `scripts/worktree-picker.sh` lists `git worktree list` for the selected
+  repo and can create a new worktree under `@cockpit-worktrees-dir`. Default
+  paths are grouped by repo name and protected by a repo marker/hash so the
+  same branch name in multiple repos cannot collide silently.
 - `scripts/agent-list.sh` finds agent panes by walking each pane's process
   tree (one `ps` snapshot, one awk pass — `#{pane_current_command}` lies:
   Claude's launcher renames itself, pi shows up as `node`). A
@@ -182,8 +192,8 @@ small isolated tmux smoke test. CI also runs `bash -n` and ShellCheck.
 - **Same-name sessions you created by hand are trusted.** Opening
   `~/work/api` when an unrelated session named `api` already exists
   attaches to that session rather than creating a duplicate. Sessions
-  created through cockpit record their root and are disambiguated
-  (`api`, `api-2`, ...).
+  created through cockpit record their root and are disambiguated with
+  parent context when possible (`api`, `work/api`, ...).
 - Keys and popup size are read when the plugin loads; changing them
   requires a tmux config reload. All other options apply live.
 
