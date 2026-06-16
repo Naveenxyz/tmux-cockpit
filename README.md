@@ -1,63 +1,147 @@
 # tmux-cockpit
 
-Use tmux as your AI coding app. One session per project and a fuzzy project
-switcher powered by your [zoxide](https://github.com/ajeetdsouza/zoxide)
-history — like the Claude or Codex desktop apps, but in tmux. Out of the box
-new sessions are plain tmux; set `@cockpit-auto-commands` to have your AI
-CLIs (or anything else) already running in their own windows in the project
-directory.
+Use tmux as your AI coding cockpit: one session per project, fast project
+switching, agent-pane discovery, git worktree creation, scratch terminals, and
+lazygit popups.
 
-## What you get
+## Features
 
-- **`prefix + o`** — popup project picker. Fuzzy-search your zoxide history
-  and open sessions, with a preview showing session windows, git status, and
-  a file tree. Pick a directory and it becomes (or switches to) a session.
-  The first nine entries are numbered: press `1`-`9` to open one instantly
-  (digits jump, they're never typed into the query). Type a real path
-  (`~/Desktop/app`, `../repo`, `work/api`) and press enter to open it even
-  if zoxide has never seen it. `ctrl-w` opens the git worktree picker for
-  the selected repo, `ctrl-x` kills a session (attached sessions are
-  protected), and `ctrl-d` prunes a directory from zoxide's history,
-  keeping the list clean.
-- **Session-per-project** — sessions are named after the directory, created
-  on demand, and reused on the next visit. Same-named projects in different
-  paths get unique names automatically.
-- **Auto commands** — with `@cockpit-auto-commands` set (e.g.
-  `claude:claude;pi:pi`), every new session opens one window per entry,
-  named and running its command in the project root, plus an extra
-  plain-shell window (auto-named by tmux). Unset (the default), new sessions are a single plain
-  window — the standard tmux experience.
-- **`prefix + a`** — agent popup. Every AI-agent pane across all your
-  sessions in one list, ordered by project — Claude Code, Codex,
-  OpenCode, and pi out of the box. The preview is the selected pane's
-  live screen, auto-refreshing every second, so you can watch an agent
-  work without leaving the popup. `enter`/`1`-`9` jumps straight to the
-  pane, `ctrl-r` reloads the list. `prefix + A` is the same picker
-  scoped to the current session. Detection is purely observational
-  (process tree) — no agent-side hooks or config to install. Agents are
-  pluggable: drop a module in `scripts/agents/` (see `agents/claude.sh`)
-  and add its name to `@cockpit-agents`.
-- **`prefix + t`** — scratch terminal in a popup, backed by a persistent
-  session (close and reopen, your shell is still there). Starts in `$HOME`
-  by default; press the key again inside to close.
-- **`prefix + g`** — [lazygit](https://github.com/jesseduffield/lazygit) in
-  a popup, opened at the git root of whatever directory the current pane is
-  in. (Requires lazygit; the binding just won't do anything without it.)
-- **`cockpit` CLI (the `zt` workflow)** — works from any terminal, inside
-  or outside tmux (it starts the server if needed):
-  - `cockpit` — open the fuzzy picker
-  - `cockpit .` — session for the current directory
-  - `cockpit -` — back to the previous session, like `cd -`
-  - `cockpit path/to/dir` — session for a directory
-  - `cockpit api` — session for the best zoxide match for "api"
+### Project picker — `prefix + o`
+
+Open the project popup from tmux:
+
+- fuzzy-search open tmux sessions and zoxide history
+- press `1`-`9` to open the first nine entries immediately
+- type a real path like `~/Desktop/app`, `../repo`, or `work/api` and press
+  enter to open it even if zoxide has never seen it
+- `ctrl-w` opens the git worktree picker for the selected repo
+- `ctrl-x` kills the selected detached session
+- `ctrl-d` prunes a directory from zoxide history
+
+### Session-per-project
+
+Cockpit names sessions after project directories and records each cockpit-owned
+session's root with `@cockpit-root`.
+
+When names collide, cockpit prefers readable parent context before numeric
+suffixes:
+
+```text
+~/work/api      -> api
+~/personal/api  -> personal/api
+```
+
+Worktrees under `@cockpit-worktrees-dir` are named with repo context first:
+
+```text
+~/worktrees/tmux-cockpit/fix-popup -> tmux-cockpit/fix-popup
+```
+
+### Git worktrees
+
+From the project picker, press `ctrl-w` on any git repo to view its worktrees or
+create a new one.
+
+The create flow asks for:
+
+1. a branch/worktree name — type a new branch or pick an existing one
+2. a location — default is under `@cockpit-worktrees-dir`
+
+Default paths are grouped by repo and protected by a repo marker/hash, so the
+same branch name in multiple repos cannot collide silently.
+
+You can also use worktrees from the CLI:
+
+```sh
+cockpit -w                         # worktree picker for the current repo
+cockpit . -w                       # same, explicitly for current dir
+cockpit tmux-cockpit -w            # picker after resolving query/path
+cockpit . -w fix-agent-popup       # open existing worktree or create it
+cockpit api -w review/readme       # resolve api with zoxide, then create/open
+cockpit . -w fix --path ~/tmp/fix  # custom destination
+```
+
+If a worktree for the requested branch already exists, cockpit switches to it.
+If not, cockpit creates it and opens it as a normal project session.
+
+### Agent picker — `prefix + a`
+
+List AI-agent panes across all sessions with live previews:
+
+- `prefix + a` — all sessions
+- `prefix + A` — current session only
+- `enter` / `1`-`9` — jump to a pane
+- `ctrl-r` — reload the list
+
+Built-in detector modules cover Claude Code, Codex, OpenCode, and pi. Detection
+is observational via process trees: no agent hooks or config required. Add more
+modules under `scripts/agents/` and include them in `@cockpit-agents`.
+
+### Scratch terminal — `prefix + t`
+
+A persistent popup terminal backed by its own tmux session. Close and reopen it
+without losing the shell.
+
+### lazygit popup — `prefix + g`
+
+Open lazygit at the git root of the current pane.
+
+### Auto commands for new sessions
+
+Set `@cockpit-auto-commands` to start AI CLIs or other commands in every new
+project session:
+
+```tmux
+set -g @cockpit-auto-commands 'claude:claude;pi:pi'
+```
+
+Each entry opens in its own named window, plus one extra plain shell window.
+Unset by default, new sessions are plain tmux.
+
+## CLI
+
+`cockpit` works inside or outside tmux. Outside tmux it starts/attaches to the
+server when needed.
+
+```text
+tmux-cockpit
+
+Usage:
+  cockpit                         Open the project picker
+  cockpit .                       Open current directory as a project session
+  cockpit <path>                  Open a path as a project session
+  cockpit <query...>              Open best zoxide match as a project session
+  cockpit -                       Switch to the previous tmux session
+
+Worktrees:
+  cockpit -w                      Worktree picker for the current repo
+  cockpit . -w                    Worktree picker for the current repo
+  cockpit <query> -w              Worktree picker for a zoxide/path repo
+  cockpit . -w <branch>           Open existing worktree for branch, or create it
+  cockpit <query> -w <branch>     Same, after resolving query/path to a repo
+  cockpit . -w <branch> --path <dir>
+                                  Create at a custom path if it does not exist
+
+Options:
+  -w, --worktree                  Use git worktree mode
+  --path <dir>                    Custom worktree destination for -w <branch>
+  -h, --help                      Show this help
+```
+
+Run:
+
+```sh
+cockpit --help
+```
 
 ## Requirements
 
-- tmux ≥ 3.2 (for `display-popup`)
+- tmux ≥ 3.2 for `display-popup`
 - [fzf](https://github.com/junegunn/fzf)
-- [zoxide](https://github.com/ajeetdsouza/zoxide) (recommended — it supplies
-  the project list; without it, set `@cockpit-project-dirs`)
-- Optional: `eza` or `tree` for nicer previews
+- [zoxide](https://github.com/ajeetdsouza/zoxide) recommended for project history
+- git for worktree features
+- optional: `eza` or `tree` for nicer previews
+- optional: `lazygit` for `prefix + g`
 
 ## Install
 
@@ -67,8 +151,7 @@ With [TPM](https://github.com/tmux-plugins/tpm), add to `~/.tmux.conf`:
 set -g @plugin 'Naveenxyz/tmux-cockpit'
 ```
 
-Then press `prefix + I`. That's it — no scripts to copy, no shell config to
-edit.
+Then press `prefix + I`.
 
 Manual install:
 
@@ -77,127 +160,89 @@ git clone https://github.com/Naveenxyz/tmux-cockpit ~/.tmux/plugins/tmux-cockpit
 ```
 
 ```tmux
-# ~/.tmux.conf
 run-shell ~/.tmux/plugins/tmux-cockpit/cockpit.tmux
 ```
 
-Optional CLI — symlink `bin/cockpit` somewhere on your `PATH`, under any
-name you like (`zt` is a nice short one):
+Optional CLI symlink:
 
 ```sh
 ln -s ~/.tmux/plugins/tmux-cockpit/bin/cockpit /usr/local/bin/cockpit
-ln -s ~/.tmux/plugins/tmux-cockpit/bin/cockpit /usr/local/bin/zt
 ```
-
-Then `zt .`, `zt myproject`, or plain `zt` from any terminal — tmux running
-or not.
 
 ## Configuration
 
-All options are optional; set them in `~/.tmux.conf` before the plugin line.
+All options are optional. Set them before the plugin line.
 
 ```tmux
-# Keys
-set -g @cockpit-popup-key 'o'            # prefix + key for the popup picker
-set -g @cockpit-last-key ''              # prefix + key for previous session
-                                         # (off by default — e.g. 'p' collides
-                                         # with stock previous-window)
+# Project picker
+set -g @cockpit-popup-key 'o'
+set -g @cockpit-popup-width '75%'
+set -g @cockpit-popup-height '65%'
+set -g @cockpit-popup-title ' projects '
+set -g @cockpit-fzf-opts '--color=bg+:#283457,hl:#7aa2f7'
+set -g @cockpit-project-dirs '~/projects:~/work'
 
-# Agent popup (prefix + a all sessions, prefix + A current session)
-set -g @cockpit-agents-popup 'on'        # 'off' to disable the bindings
+# Previous session key (off by default)
+set -g @cockpit-last-key 'p'
+
+# Agent picker
+set -g @cockpit-agents-popup 'on'
 set -g @cockpit-agents-key 'a'
 set -g @cockpit-agents-current-key 'A'
-set -g @cockpit-agents 'claude codex opencode pi'  # modules to load from scripts/agents/
-set -g @cockpit-agents-width '75%'       # defaults to @cockpit-popup-width
-set -g @cockpit-agents-height '65%'      # defaults to @cockpit-popup-height
+set -g @cockpit-agents 'claude codex opencode pi'
+set -g @cockpit-agents-width '75%'
+set -g @cockpit-agents-height '65%'
 
-# Scratch terminal popup (prefix + t)
-set -g @cockpit-scratch 'on'             # 'off' to disable the binding
+# Worktrees
+set -g @cockpit-worktrees-dir '~/worktrees'
+
+# Scratch terminal
+set -g @cockpit-scratch 'on'
 set -g @cockpit-scratch-key 't'
-set -g @cockpit-scratch-dir '~'          # start directory
-set -g @cockpit-scratch-session 'scratch' # backing session name
+set -g @cockpit-scratch-dir '~'
+set -g @cockpit-scratch-session 'scratch'
 set -g @cockpit-scratch-width '80%'
 set -g @cockpit-scratch-height '80%'
 
-# lazygit popup at the current repo root (prefix + g)
-set -g @cockpit-lazygit 'on'             # 'off' to disable the binding
+# lazygit
+set -g @cockpit-lazygit 'on'
 set -g @cockpit-lazygit-key 'g'
 set -g @cockpit-lazygit-width '90%'
 set -g @cockpit-lazygit-height '90%'
 
-# Git worktrees (from the project picker: ctrl-w)
-set -g @cockpit-worktrees-dir '~/worktrees' # default create location
-
-# Auto commands for new project sessions (default: unset — plain tmux).
-# Format: command:name;command:name  — one window per entry, plus a final
-# plain-shell window. The name is optional (defaults to the command's first
-# word). Quote a command with '' or "" if it contains ':' or ';'.
+# Auto commands for new project sessions
 set -g @cockpit-auto-commands 'claude:claude;pi:pi'
-
-# Popup size and looks
-set -g @cockpit-popup-width '75%'
-set -g @cockpit-popup-height '65%'
-set -g @cockpit-popup-title ' projects '
-# Extra fzf flags for the picker, e.g. a --color theme (FZF_DEFAULT_OPTS
-# doesn't reach tmux popups, so theme the picker here instead)
-set -g @cockpit-fzf-opts '--color=bg+:#283457,hl:#7aa2f7'
-
-# Extra project sources (colon-separated; each dir's children are offered).
-# Useful without zoxide, or for dirs you haven't visited yet.
-set -g @cockpit-project-dirs '~/projects:~/work'
-```
-
-Example — Claude, a dev server with a custom name, and Codex, each in their
-own window of every new project session:
-
-```tmux
-set -g @cockpit-auto-commands 'claude;"npm run dev":dev;codex'
 ```
 
 ## How it works
 
 - `scripts/project-list.sh` merges open tmux sessions with `zoxide query -l`
-  (deduped by path, frecency order).
-- `scripts/open-project.sh` resolves a directory to a readable session name
-  (basename first, then parent/name, grandparent/parent/name, and only then
-  numeric suffixes), tracked via the `@cockpit-root` session option. It
-  creates the session if needed (one window per `@cockpit-auto-commands`
-  entry plus a plain shell), bumps zoxide, and switches/attaches.
-- `scripts/worktree-picker.sh` lists `git worktree list` for the selected
-  repo and can create a new worktree under `@cockpit-worktrees-dir`. Default
-  paths are grouped by repo name and protected by a repo marker/hash so the
-  same branch name in multiple repos cannot collide silently. Sessions for
-  paths under the worktrees directory are named with repo context first
-  (`repo/branch`) rather than just `branch`.
-- `scripts/agent-list.sh` finds agent panes by walking each pane's process
-  tree (one `ps` snapshot, one awk pass — `#{pane_current_command}` lies:
-  Claude's launcher renames itself, pi shows up as `node`). A
-  `scripts/agents/<name>.sh` module is one definition: `<name>_procs`,
-  the process names that claim a pane for that agent. The picker's
-  preview loops `capture-pane -e` once a second, clearing with `ESC[2J`
-  (fzf renders that as a watch-style live preview).
+  and optional static roots from `@cockpit-project-dirs`.
+- `scripts/open-project.sh` creates or reuses a session for a directory, stores
+  `@cockpit-root`, bumps zoxide, and switches/attaches.
+- `scripts/worktree-picker.sh` and `scripts/open-worktree.sh` list, create, and
+  open git worktrees using the same project-session machinery.
+- `scripts/agent-list.sh` finds agent panes by walking pane process trees from a
+  single `ps` snapshot.
 
 ## Development
 
-Run the local checks with:
+Run local checks:
 
 ```sh
 tests/run.sh
+shellcheck -e SC1090,SC1091 cockpit.tmux bin/cockpit scripts/*.sh scripts/agents/*.sh tests/*.sh
 ```
 
-The test suite covers the auto-command parser, session-name collision
-resolution, project-list deduping, the agent module interface, and a
-small isolated tmux smoke test. CI also runs `bash -n` and ShellCheck.
+CI runs syntax checks, ShellCheck, and the test suite.
 
 ## Known limitations
 
-- **Same-name sessions you created by hand are trusted.** Opening
-  `~/work/api` when an unrelated session named `api` already exists
-  attaches to that session rather than creating a duplicate. Sessions
-  created through cockpit record their root and are disambiguated with
-  parent context when possible (`api`, `work/api`, ...).
-- Keys and popup size are read when the plugin loads; changing them
-  requires a tmux config reload. All other options apply live.
+- Same-name sessions created manually are trusted. If a manual session named
+  `api` exists, opening `~/work/api` attaches to it rather than creating a
+  duplicate.
+- Keys and popup size are read when the plugin loads; changing them requires a
+  tmux config reload. Most other options apply live.
 
 ## License
 
