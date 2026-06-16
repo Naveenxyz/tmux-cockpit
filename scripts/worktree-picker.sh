@@ -36,67 +36,10 @@ if [ -z "$path" ] || [ ! -d "$path" ]; then
   exit 1
 fi
 
-repo="$(git -C "$path" rev-parse --show-toplevel 2>/dev/null)" || {
+repo="$(git_repo_for_path "$path")" || {
   cockpit_error "not inside a git repo: $(display_path "$path")"
   sleep 1
   exit 1
-}
-
-common_dir_abs() {
-  local root="$1" common
-  common="$(git -C "$root" rev-parse --git-common-dir 2>/dev/null)" || return 1
-  case "$common" in
-    /*) printf '%s' "$common" ;;
-    *)  (cd "$root/$common" && pwd) ;;
-  esac
-}
-
-safe_path_component() {
-  local s="$1"
-  s="$(printf '%s' "$s" | tr '/: ' '---')"
-  [ -n "$s" ] || s="worktree"
-  printf '%s' "$s"
-}
-
-path_hash() {
-  cksum | awk '{ print $1 }'
-}
-
-worktrees_base() {
-  local base
-  base="$(get_opt "@cockpit-worktrees-dir" "$HOME/worktrees")"
-  case "$base" in
-    ~) base="$HOME" ;;
-    ~/*) base="$HOME/${base#~/}" ;;
-  esac
-  printf '%s' "$base"
-}
-
-repo_worktree_dir() {
-  local root="$1" base slug dir marker common hash
-  base="$(worktrees_base)"
-  slug="$(safe_path_component "$(basename "$root")")"
-  dir="$base/$slug"
-  marker="$dir/.cockpit-repo"
-  common="$(common_dir_abs "$root")"
-
-  if [ -e "$dir" ]; then
-    if [ -f "$marker" ] && [ "$(cat "$marker" 2>/dev/null)" = "$common" ]; then
-      printf '%s' "$dir"
-      return 0
-    fi
-    hash="$(printf '%s' "$common" | path_hash)"
-    dir="$base/$slug-$hash"
-  fi
-  printf '%s' "$dir"
-}
-
-is_same_repo_worktree() {
-  local candidate="$1" root="$2" a b
-  [ -d "$candidate" ] || return 1
-  a="$(common_dir_abs "$candidate" 2>/dev/null)" || return 1
-  b="$(common_dir_abs "$root" 2>/dev/null)" || return 1
-  [ "$a" = "$b" ]
 }
 
 choose_branch() {
@@ -161,51 +104,21 @@ choose_location() {
 
   dest="$(trim_ws "${query:-$selection}")"
   [ -n "$dest" ] || dest="$default_dir"
-  case "$dest" in
-    ~) dest="$HOME" ;;
-    ~/*) dest="$HOME/${dest#~/}" ;;
-  esac
-  case "$dest" in
-    /*) ;;
-    *) dest="$(pane_or_shell_dir)/$dest" ;;
-  esac
-  printf '%s' "$dest"
+  normalize_worktree_dest "$dest"
 }
 
 create_worktree() {
-  local branch default_dir dest repo_dir marker common parent
+  local branch default_dir dest repo_dir
 
   branch="$(choose_branch)" || exit 0
   repo_dir="$(repo_worktree_dir "$repo")"
   default_dir="$repo_dir/$(safe_path_component "$branch")"
   dest="$(choose_location "$default_dir")" || exit 0
 
-  if [ -e "$dest" ]; then
-    if is_same_repo_worktree "$dest" "$repo"; then
-      exec "$COCKPIT_SCRIPTS/open-project.sh" "$dest"
-    fi
-    cockpit_error "path already exists and is not a worktree for this repo: $dest"
-    sleep 2.4
-    exit 1
-  fi
-
-  parent="$(dirname "$dest")"
-  mkdir -p "$parent" "$repo_dir"
-  common="$(common_dir_abs "$repo")"
-  marker="$repo_dir/.cockpit-repo"
-  [ -f "$marker" ] || printf '%s\n' "$common" >"$marker"
-
   clear
   printf 'Creating worktree\n\n  repo:   %s\n  branch: %s\n  path:   %s\n\n' \
     "$(display_path "$repo")" "$branch" "$(display_path "$dest")"
-
-  if git -C "$repo" show-ref --verify --quiet "refs/heads/$branch"; then
-    git -C "$repo" worktree add "$dest" "$branch" || { printf '\nfailed; press any key to close... '; read -r -n 1 _; exit 1; }
-  else
-    git -C "$repo" worktree add -b "$branch" "$dest" || { printf '\nfailed; press any key to close... '; read -r -n 1 _; exit 1; }
-  fi
-
-  exec "$COCKPIT_SCRIPTS/open-project.sh" "$dest"
+  exec "$COCKPIT_SCRIPTS/open-worktree.sh" "$repo" "$branch" "$dest"
 }
 
 emit_worktrees() {

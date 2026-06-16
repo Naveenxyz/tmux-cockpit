@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 # Terminal entry point (the `zt` workflow). Works inside tmux (switches
 # session) and outside (starts the server if needed and attaches).
-#   cockpit              — fuzzy-pick a project, open/attach its session
-#   cockpit .            — session for the current directory
-#   cockpit -            — back to the previous session (like cd -)
-#   cockpit <path>       — session for a directory (relative or absolute)
-#   cockpit <query...>   — resolve the query with zoxide and open its session
-# Symlink it as `zt` (or anything else) — the name doesn't matter.
 
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
@@ -16,13 +10,123 @@ while [ -L "$SOURCE" ]; do
 done
 ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
 
-if [ $# -eq 0 ]; then
+usage() {
+  cat <<'EOF'
+tmux-cockpit
+
+Usage:
+  cockpit                         Open the project picker
+  cockpit .                       Open current directory as a project session
+  cockpit <path>                  Open a path as a project session
+  cockpit <query...>              Open best zoxide match as a project session
+  cockpit -                       Switch to the previous tmux session
+
+Worktrees:
+  cockpit -w                      Worktree picker for the current repo
+  cockpit . -w                    Worktree picker for the current repo
+  cockpit <query> -w              Worktree picker for a zoxide/path repo
+  cockpit . -w <branch>           Open existing worktree for branch, or create it
+  cockpit <query> -w <branch>     Same, after resolving query/path to a repo
+  cockpit . -w <branch> --path <dir>
+                                  Create at a custom path if it does not exist
+
+Options:
+  -w, --worktree                  Use git worktree mode
+  --path <dir>                    Custom worktree destination for -w <branch>
+  -h, --help                      Show this help
+
+Examples:
+  cockpit .
+  cockpit api
+  cockpit -
+  cockpit -w
+  cockpit . -w fix-agent-popup
+  cockpit tmux-cockpit -w review/readme --path ~/Desktop/review-readme
+EOF
+}
+
+resolve_project_arg() {
+  if [ "$#" -eq 0 ]; then
+    (cd . && pwd)
+    return 0
+  fi
+
+  if [ "$#" -eq 1 ] && [ -d "$1" ]; then
+    (cd "$1" && pwd)
+    return 0
+  fi
+
+  if ! command -v zoxide >/dev/null 2>&1; then
+    echo "cockpit: zoxide is required for query mode (brew install zoxide)" >&2
+    return 1
+  fi
+
+  zoxide query -- "$@" || {
+    echo "cockpit: no match for: $*" >&2
+    return 1
+  }
+}
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage
+  exit 0
+fi
+
+worktree_mode=""
+path_arg=""
+before=()
+after=()
+seen_worktree=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -w|--worktree)
+      worktree_mode=1
+      seen_worktree=1
+      shift
+      ;;
+    --path)
+      shift
+      if [ "$#" -eq 0 ]; then
+        echo "cockpit: --path requires a directory" >&2
+        exit 2
+      fi
+      path_arg="$1"
+      shift
+      ;;
+    *)
+      if [ -n "$seen_worktree" ]; then
+        after+=("$1")
+      else
+        before+=("$1")
+      fi
+      shift
+      ;;
+  esac
+done
+
+if [ -n "$worktree_mode" ]; then
+  if [ "${#before[@]}" -eq 0 ]; then
+    before=(.)
+  fi
+  repo_path="$(resolve_project_arg "${before[@]}")" || exit 1
+  if [ "${#after[@]}" -eq 0 ]; then
+    exec "$ROOT/scripts/worktree-picker.sh" "D:$repo_path"
+  fi
+  branch="${after[0]}"
+  exec "$ROOT/scripts/open-worktree.sh" "$repo_path" "$branch" "$path_arg"
+fi
+
+if [ "${#before[@]}" -eq 0 ]; then
   exec "$ROOT/scripts/picker.sh"
 fi
 
-# 'zt -' — previous session, like cd -. Outside tmux, plain attach already
-# picks the most recently active session.
-if [ "$1" = "-" ]; then
+# 'cockpit -' — previous session, like cd -. Outside tmux, plain attach
+# already picks the most recently active session.
+if [ "${#before[@]}" -eq 1 ] && [ "${before[0]}" = "-" ]; then
   if [ -n "$TMUX" ]; then
     exec tmux switch-client -l
   else
@@ -30,16 +134,5 @@ if [ "$1" = "-" ]; then
   fi
 fi
 
-# A directory argument ('.', 'sub/dir', '/abs/path', '~/x' expanded by the
-# shell) opens directly — no zoxide needed.
-if [ $# -eq 1 ] && [ -d "$1" ]; then
-  exec "$ROOT/scripts/open-project.sh" "$(cd "$1" && pwd)"
-fi
-
-if ! command -v zoxide >/dev/null 2>&1; then
-  echo "cockpit: zoxide is required for query mode (brew install zoxide)" >&2
-  exit 1
-fi
-
-dest="$(zoxide query -- "$@")" || { echo "cockpit: no match for: $*" >&2; exit 1; }
+dest="$(resolve_project_arg "${before[@]}")" || exit 1
 exec "$ROOT/scripts/open-project.sh" "$dest"

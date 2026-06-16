@@ -333,7 +333,7 @@ pane_or_shell_dir() {
 # path-like input. This lets prefix+o accept ~/Desktop/foo, ../repo, or
 # src/project without treating ordinary fuzzy queries as paths.
 resolve_typed_dir() {
-  local q="$1" base candidate
+  local q="$1" candidate
   q="$(trim_ws "$q")"
   [ -n "$q" ] || return 1
 
@@ -348,4 +348,84 @@ resolve_typed_dir() {
 
   [ -d "$candidate" ] || return 1
   (cd "$candidate" && pwd)
+}
+
+git_repo_for_path() {
+  local path="$1"
+  [ -n "$path" ] && [ -d "$path" ] || return 1
+  git -C "$path" rev-parse --show-toplevel 2>/dev/null
+}
+
+common_dir_abs() {
+  local root="$1" common
+  common="$(git -C "$root" rev-parse --git-common-dir 2>/dev/null)" || return 1
+  case "$common" in
+    /*) printf '%s' "$common" ;;
+    *)  (cd "$root/$common" && pwd) ;;
+  esac
+}
+
+safe_path_component() {
+  local s="$1"
+  s="$(printf '%s' "$s" | tr '/: ' '---')"
+  [ -n "$s" ] || s="worktree"
+  printf '%s' "$s"
+}
+
+path_hash() {
+  cksum | awk '{ print $1 }'
+}
+
+worktrees_base() {
+  local base
+  base="$(get_opt "@cockpit-worktrees-dir" "$HOME/worktrees")"
+  expand_home_path "$base"
+}
+
+repo_worktree_dir() {
+  local root="$1" base slug dir marker common hash
+  base="$(worktrees_base)"
+  slug="$(safe_path_component "$(basename "$root")")"
+  dir="$base/$slug"
+  marker="$dir/.cockpit-repo"
+  common="$(common_dir_abs "$root")"
+
+  if [ -e "$dir" ]; then
+    if [ -f "$marker" ] && [ "$(cat "$marker" 2>/dev/null)" = "$common" ]; then
+      printf '%s' "$dir"
+      return 0
+    fi
+    hash="$(printf '%s' "$common" | path_hash)"
+    dir="$base/$slug-$hash"
+  fi
+  printf '%s' "$dir"
+}
+
+is_same_repo_worktree() {
+  local candidate="$1" root="$2" a b
+  [ -d "$candidate" ] || return 1
+  a="$(common_dir_abs "$candidate" 2>/dev/null)" || return 1
+  b="$(common_dir_abs "$root" 2>/dev/null)" || return 1
+  [ "$a" = "$b" ]
+}
+
+worktree_for_branch() {
+  local repo="$1" branch="$2"
+  git -C "$repo" worktree list --porcelain | awk -v branch="refs/heads/$branch" '
+    /^worktree / { path = substr($0, 10); next }
+    /^branch / && substr($0, 8) == branch { print path; exit }
+  '
+}
+
+normalize_worktree_dest() {
+  local dest="$1"
+  case "$dest" in
+    ~) dest="$HOME" ;;
+    ~/*) dest="$HOME/${dest#~/}" ;;
+  esac
+  case "$dest" in
+    /*) ;;
+    *) dest="$(pane_or_shell_dir)/$dest" ;;
+  esac
+  printf '%s' "$dest"
 }
