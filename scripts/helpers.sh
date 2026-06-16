@@ -11,15 +11,59 @@ get_opt() {
   printf '%s' "${value:-$2}"
 }
 
-# tmux session names cannot contain '.' or ':' — sanitize a directory
-# basename into a valid, target-friendly session name.
-session_name_for() {
-  local base name
-  base="$(basename "$1")"
-  [ "$base" = "/" ] && base="root"
-  name="$(printf '%s' "$base" | tr '.: /' '____')"
+# Sanitize one path component into a valid, target-friendly tmux session
+# name component. Keep '-' and '_' readable; replace separators that confuse
+# tmux targets or shells. We intentionally keep '/' between components in
+# candidate names below because names like "repo/branch" are much clearer
+# than "repo_branch".
+sanitize_session_component() {
+  local name
+  name="$(printf '%s' "$1" | tr '.: ' '___')"
   [ -n "$name" ] || name="root"
   printf '%s' "$name"
+}
+
+# Backwards-compatible single-path session name: the directory basename.
+session_name_for() {
+  local base
+  base="$(basename "$1")"
+  [ "$base" = "/" ] && base="root"
+  sanitize_session_component "$base"
+}
+
+# Print readable session-name candidates for <path>, from least to most
+# specific. For /Users/me/work/api:
+#   api
+#   work/api
+#   me/work/api
+#   Users/me/work/api
+# Numeric suffixes are only a last resort; parent context is more readable
+# for same-named repos and worktrees.
+session_name_candidates_for_path() {
+  local path="$1" rel part name rest
+  path="${path%/}"
+  [ -n "$path" ] || path="/"
+
+  if [ "$path" = "/" ]; then
+    printf 'root\n'
+    return 0
+  fi
+
+  rel="${path#/}"
+  name=""
+  while [ -n "$rel" ]; do
+    part="${rel##*/}"
+    if [ -n "$name" ]; then
+      name="$(sanitize_session_component "$part")/$name"
+    else
+      name="$(sanitize_session_component "$part")"
+    fi
+    printf '%s\n' "$name"
+    [ "$rel" = "$part" ] && break
+    rest="${rel%/*}"
+    [ "$rest" = "$rel" ] && break
+    rel="$rest"
+  done
 }
 
 session_exists() {
@@ -36,19 +80,45 @@ session_root() {
 # same basename already took the name, append -2, -3, ... Sessions without a
 # recorded root (created outside cockpit) are treated as a match so we attach
 # instead of duplicating.
+session_for_root() {
+  local path="$1"
+  tmux list-sessions -F $'#{session_name}\t#{@cockpit-root}' 2>/dev/null \
+    | awk -F'\t' -v p="$path" '$2 == p {print $1; exit}'
+}
+
 resolve_session_for_path() {
-  local path="$1" base name root i
+  local path="$1" existing name root base i
+
+  existing="$(session_for_root "$path")"
+  if [ -n "$existing" ]; then
+    printf '%s' "$existing"
+    return 0
+  fi
+
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    if ! session_exists "$name"; then
+      printf '%s' "$name"
+      return 0
+    fi
+    root="$(session_root "$name")"
+    if [ -z "$root" ] || [ "$root" = "$path" ]; then
+      printf '%s' "$name"
+      return 0
+    fi
+  done < <(session_name_candidates_for_path "$path")
+
   base="$(session_name_for "$path")"
-  name="$base"
   i=2
+  name="${base}-${i}"
   while session_exists "$name"; do
     root="$(session_root "$name")"
     if [ -z "$root" ] || [ "$root" = "$path" ]; then
       printf '%s' "$name"
       return 0
     fi
-    name="${base}-${i}"
     i=$((i + 1))
+    name="${base}-${i}"
   done
   printf '%s' "$name"
 }
@@ -224,4 +294,39 @@ display_path() {
     "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;;
     *) printf '%s' "$1" ;;
   esac
+}
+
+trim_ws() {
+  local v="$1"
+  v="${v#"${v%%[![:space:]]*}"}"
+  v="${v%"${v##*[![:space:]]}"}"
+  printf '%s' "$v"
+}
+
+pane_or_shell_dir() {
+  local dir
+  dir="$(tmux display-message -p '#{pane_current_path}' 2>/dev/null || true)"
+  [ -n "$dir" ] || dir="$PWD"
+  printf '%s' "$dir"
+}
+
+# Resolve a user-typed picker query to a real directory, but only for
+# path-like input. This lets prefix+o accept ~/Desktop/foo, ../repo, or
+# src/project without treating ordinary fuzzy queries as paths.
+resolve_typed_dir() {
+  local q="$1" base candidate
+  q="$(trim_ws "$q")"
+  [ -n "$q" ] || return 1
+
+  case "$q" in
+    ~) candidate="$HOME" ;;
+    ~/*) candidate="$HOME/${q#~/}" ;;
+    /*) candidate="$q" ;;
+    .|..|./*|../*) candidate="$(pane_or_shell_dir)/$q" ;;
+    */*) candidate="$(pane_or_shell_dir)/$q" ;;
+    *) return 1 ;;
+  esac
+
+  [ -d "$candidate" ] || return 1
+  (cd "$candidate" && pwd)
 }

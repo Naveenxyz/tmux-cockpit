@@ -50,6 +50,7 @@ assert_eq "my_project" "$(session_name_for "/tmp/my.project")" "session name rep
 assert_eq "my_project" "$(session_name_for "/tmp/my:project")" "session name replaces colons"
 assert_eq "my_project" "$(session_name_for "/tmp/my project")" "session name replaces spaces"
 assert_eq "root" "$(session_name_for "/")" "session name for filesystem root"
+assert_eq $'api\ntmp/api' "$(session_name_candidates_for_path "/tmp/api")" "session candidates add parent context"
 
 session_exists() {
   case "$1" in
@@ -66,7 +67,7 @@ session_root() {
   esac
 }
 
-assert_eq "api-2" "$(resolve_session_for_path "/tmp/api")" "resolve existing cockpit-owned collision"
+assert_eq "tmp/api" "$(resolve_session_for_path "/tmp/api")" "resolve existing cockpit-owned collision with parent context"
 assert_eq "api-3" "$(resolve_session_for_path "/tmp/api-3")" "resolve next collision suffix"
 assert_eq "manual" "$(resolve_session_for_path "/tmp/manual")" "manual sessions without roots are trusted"
 
