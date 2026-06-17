@@ -15,6 +15,7 @@ Open the project popup from tmux:
 - type a real path like `~/Desktop/app`, `../repo`, or `work/api` and press
   enter to open it even if zoxide has never seen it
 - `ctrl-w` opens the git worktree picker for the selected repo
+- `ctrl-f` starts a multi-repo **feature** (see below)
 - `ctrl-x` kills the selected detached session
 - `ctrl-d` prunes a directory from zoxide history
 
@@ -63,6 +64,53 @@ cockpit . -w fix --path ~/tmp/fix  # custom destination
 
 If a worktree for the requested branch already exists, cockpit switches to it.
 If not, cockpit creates it and opens it as a normal project session.
+
+### Multi-repo features — `ctrl-f`
+
+Work that spans several repos at once (a "feature") gets its own set of
+worktrees under `@cockpit-worktrees-dir/features/<name>`.
+
+From the project picker, press `ctrl-f`:
+
+1. **name the feature first** — the current picker query is used as the name,
+   or you are prompted for one.
+2. **select repos** — a list of directories that contain a `.git` entry. This
+   is a multi-select: press `TAB` to mark each repo you want (a `✓` appears),
+   `ctrl-a` to mark all, then `enter` to clone them. A plain `enter` with
+   nothing marked just uses the highlighted repo.
+
+Clone progress is shown live, one repo at a time, so you can watch each fetch.
+If `@cockpit-worktrees-dir/features/<name>` already exists, cockpit
+**recreates** it — the existing folder and any cockpit sessions rooted in it
+are removed first (after a short warning), then everything is rebuilt.
+
+Cockpit then creates:
+
+```text
+~/worktrees/features/<name>/
+  repo-a/      # fresh clone of repo-a, on a new branch <name>
+  repo-b/      # fresh clone of repo-b, on a new branch <name>
+```
+
+By default each repo is **cloned fresh** (from its `origin` remote when it has
+one, else from the local repo) and a new branch `<name>` is created from the
+clone's default branch — independent, pushable repos. Set
+`@cockpit-feature-mode worktree` to instead add a lightweight git **worktree**
+per repo (shares the source repo's object store, no clone).
+
+The folder is named after the repo; repos that share a basename are
+disambiguated (`repo`, `repo-2`). Pressing `enter` opens the `features/<name>`
+folder as a new session.
+
+**Local, often-gitignored files** are copied from each source repo into its
+new copy, preserving relative paths — so the projects are ready to run and to
+hand to an agent. Copied: `.env` / `.env.*`, `AGENTS.md`, and `CLAUDE.md`
+(any depth, skipping `.git` and `node_modules`).
+
+> Note: terminals can't represent `ctrl-shift-w` (control keys carry no shift
+> bit, and `ctrl-w` is already the single-repo worktree key), so this is bound
+> to `ctrl-f` ("feature"). Rebind it by editing the `ctrl-f` line in
+> `scripts/picker.sh`.
 
 ### Agent picker — `prefix + a`
 
@@ -196,6 +244,11 @@ set -g @cockpit-agents-height '65%'
 # Worktrees
 set -g @cockpit-worktrees-dir '~/worktrees'
 
+# Multi-repo features (ctrl-f in the project picker)
+# 'clone' (default): fresh clone per repo, new branch from main
+# 'worktree': lightweight git worktree per repo
+set -g @cockpit-feature-mode 'clone'
+
 # Scratch terminal
 set -g @cockpit-scratch 'on'
 set -g @cockpit-scratch-key 't'
@@ -222,8 +275,14 @@ set -g @cockpit-auto-commands 'claude:claude;pi:pi'
   `@cockpit-root`, bumps zoxide, and switches/attaches.
 - `scripts/worktree-picker.sh` and `scripts/open-worktree.sh` list, create, and
   open git worktrees using the same project-session machinery.
+- `scripts/repo-list.sh`, `scripts/feature-picker.sh`, and
+  `scripts/open-feature.sh` drive multi-repo features: pick git repos, then
+  clone (or worktree) each under `features/<name>` and copy in `.env` files.
 - `scripts/agent-list.sh` finds agent panes by walking pane process trees from a
   single `ps` snapshot.
+- `scripts/helpers.sh` is a thin loader for `scripts/lib/` — `util.sh` (options,
+  paths, messaging), `session.sh` (session naming and lifecycle), and
+  `worktree.sh` (git/worktree paths). Every script sources `helpers.sh`.
 
 ## Development
 
@@ -231,7 +290,7 @@ Run local checks:
 
 ```sh
 tests/run.sh
-shellcheck -e SC1090,SC1091 cockpit.tmux bin/cockpit scripts/*.sh scripts/agents/*.sh tests/*.sh
+shellcheck -e SC1090,SC1091 cockpit.tmux bin/cockpit scripts/*.sh scripts/lib/*.sh scripts/agents/*.sh tests/*.sh
 ```
 
 CI runs syntax checks, ShellCheck, and the test suite.

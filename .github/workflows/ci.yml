@@ -15,10 +15,10 @@ jobs:
           sudo apt-get install -y shellcheck tmux
       - name: Syntax check
         run: |
-          for file in cockpit.tmux bin/cockpit scripts/*.sh scripts/agents/*.sh tests/*.sh; do
+          for file in cockpit.tmux bin/cockpit scripts/*.sh scripts/lib/*.sh scripts/agents/*.sh tests/*.sh; do
             bash -n "$file"
           done
       - name: ShellCheck
-        run: shellcheck -e SC1090,SC1091 cockpit.tmux bin/cockpit scripts/*.sh scripts/agents/*.sh tests/*.sh
+        run: shellcheck -e SC1090,SC1091 cockpit.tmux bin/cockpit scripts/*.sh scripts/lib/*.sh scripts/agents/*.sh tests/*.sh
       - name: Tests
         run: tests/run.sh
