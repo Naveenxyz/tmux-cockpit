@@ -30,8 +30,15 @@ Worktrees:
   cockpit . -w <branch> --path <dir>
                                   Create at a custom path if it does not exist
 
+Features (multi-repo):
+  cockpit -f                      Feature picker (name it, then select repos)
+  cockpit -f <name>               Feature picker with the name pre-filled
+  cockpit -f <name> <repo>...     Create feature <name> from the given repos
+                                  (each <repo> is a path or a zoxide query)
+
 Options:
   -w, --worktree                  Use git worktree mode
+  -f, --feature                   Use multi-repo feature mode
   --path <dir>                    Custom worktree destination for -w <branch>
   -h, --help                      Show this help
 
@@ -42,6 +49,8 @@ Examples:
   cockpit -w
   cockpit . -w fix-agent-popup
   cockpit tmux-cockpit -w review/readme --path ~/Desktop/review-readme
+  cockpit -f checkout-flow
+  cockpit -f checkout-flow api web payments
 EOF
 }
 
@@ -73,10 +82,13 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
 fi
 
 worktree_mode=""
+feature_mode_flag=""
 path_arg=""
 before=()
 after=()
+feat=()
 seen_worktree=""
+seen_feature=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help)
@@ -86,6 +98,11 @@ while [ "$#" -gt 0 ]; do
     -w|--worktree)
       worktree_mode=1
       seen_worktree=1
+      shift
+      ;;
+    -f|--feature)
+      feature_mode_flag=1
+      seen_feature=1
       shift
       ;;
     --path)
@@ -98,7 +115,9 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     *)
-      if [ -n "$seen_worktree" ]; then
+      if [ -n "$seen_feature" ]; then
+        feat+=("$1")
+      elif [ -n "$seen_worktree" ]; then
         after+=("$1")
       else
         before+=("$1")
@@ -107,6 +126,25 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+# Multi-repo feature: `cockpit -f` (interactive picker), `cockpit -f <name>`
+# (picker with the name pre-filled), or `cockpit -f <name> <repo>...` to
+# create it non-interactively. Each <repo> is resolved like a project arg
+# (a path, or a single zoxide query).
+if [ -n "$feature_mode_flag" ]; then
+  if [ "${#feat[@]}" -le 1 ]; then
+    exec "$ROOT/scripts/feature-picker.sh" "${feat[@]}"
+  fi
+  name="${feat[0]}"
+  repos=()
+  i=1
+  while [ "$i" -lt "${#feat[@]}" ]; do
+    repo_path="$(resolve_project_arg "${feat[$i]}")" || exit 1
+    repos+=("$repo_path")
+    i=$((i + 1))
+  done
+  exec "$ROOT/scripts/open-feature.sh" "$name" "${repos[@]}"
+fi
 
 if [ -n "$worktree_mode" ]; then
   if [ "${#before[@]}" -eq 0 ]; then

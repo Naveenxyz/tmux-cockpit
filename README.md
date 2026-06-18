@@ -105,7 +105,16 @@ folder as a new session.
 **Local, often-gitignored files** are copied from each source repo into its
 new copy, preserving relative paths — so the projects are ready to run and to
 hand to an agent. Copied: `.env` / `.env.*`, `AGENTS.md`, and `CLAUDE.md`
-(any depth, skipping `.git` and `node_modules`).
+(any depth, skipping `.git` and `node_modules`). Symlinked matches (e.g. a
+`CLAUDE.md -> AGENTS.md` link) are dereferenced so the copy is self-contained.
+
+You can also drive features from the CLI:
+
+```sh
+cockpit -f                         # picker: name it, then select repos
+cockpit -f checkout-flow           # picker with the name pre-filled
+cockpit -f checkout-flow api web   # create it from resolved repos directly
+```
 
 > Note: terminals can't represent `ctrl-shift-w` (control keys carry no shift
 > bit, and `ctrl-w` is already the single-repo worktree key), so this is bound
@@ -170,8 +179,15 @@ Worktrees:
   cockpit . -w <branch> --path <dir>
                                   Create at a custom path if it does not exist
 
+Features (multi-repo):
+  cockpit -f                      Feature picker (name it, then select repos)
+  cockpit -f <name>               Feature picker with the name pre-filled
+  cockpit -f <name> <repo>...     Create feature <name> from the given repos
+                                  (each <repo> is a path or a zoxide query)
+
 Options:
   -w, --worktree                  Use git worktree mode
+  -f, --feature                   Use multi-repo feature mode
   --path <dir>                    Custom worktree destination for -w <branch>
   -h, --help                      Show this help
 ```
