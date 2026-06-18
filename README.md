@@ -177,15 +177,14 @@ Open lazygit at the git root of the current pane.
 
 ### Editor toggle — `prefix + v`
 
-A dedicated nvim pane that toggles in and out:
+A dedicated nvim window that toggles in and out:
 
-- from a normal pane, `prefix + v` focuses this window's nvim pane — creating
-  it (running `nvim .` at the project root) if there isn't one yet
-- from the nvim pane, `prefix + v` jumps back to the pane you came from
+- from any other window, `prefix + v` switches to this session's `nvim` window
+  — creating it (running `nvim .` at the project root) if there isn't one yet
+- from the nvim window, `prefix + v` jumps back to the window you came from
 
-The editor lives beside the work it belongs to (one nvim pane per window), and
-"go back" rides on tmux's own last-pane tracking. Disable with
-`@cockpit-nvim off`.
+You always have one nvim window per session, and "go back" rides on tmux's own
+last-window tracking. Disable with `@cockpit-nvim off`.
 
 ### Auto commands for new sessions
 
@@ -336,12 +335,11 @@ set -g @cockpit-lazygit-key 'g'
 set -g @cockpit-lazygit-width '90%'
 set -g @cockpit-lazygit-height '90%'
 
-# Editor toggle pane (prefix + v)
+# Editor toggle window (prefix + v)
 set -g @cockpit-nvim 'on'
 set -g @cockpit-nvim-key 'v'
 set -g @cockpit-nvim-command 'nvim .'
-set -g @cockpit-nvim-split 'h'        # 'h' side-by-side, 'v' stacked
-set -g @cockpit-nvim-size '50%'
+set -g @cockpit-nvim-name 'nvim'
 
 # Auto commands for new project sessions
 set -g @cockpit-auto-commands 'claude:claude;pi:pi'

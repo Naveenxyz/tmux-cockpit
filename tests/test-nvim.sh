@@ -14,7 +14,7 @@ export LOG
 export NVIM_CMD="true ."
 
 # tmux stub: logs every invocation, answers the format queries the script
-# makes, and is driven by env vars (CUR_CMD, MARKED, PANES, ROOT_OPT).
+# makes, and is driven by env vars (WIN_NAME, MARKED, WINS, ROOT_OPT).
 cat >"$TMPDIR/bin/tmux" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$LOG"
@@ -23,22 +23,22 @@ case "$1" in
     fmt=""
     for a in "$@"; do case "$a" in '#{'*) fmt="$a" ;; esac; done
     case "$fmt" in
-      '#{pane_id}') echo "%5" ;;
-      '#{window_id}') echo "@1" ;;
-      '#{pane_current_command}') echo "${CUR_CMD:-bash}" ;;
-      '#{pane_current_path}') echo "${HOME}" ;;
       '#{session_name}') echo "proj" ;;
+      '#{window_id}') echo "@1" ;;
+      '#{window_name}') echo "${WIN_NAME:-bash}" ;;
+      '#{pane_current_path}') echo "${HOME}" ;;
       *) echo "" ;;
     esac ;;
   show-options | show-option)
     case "$*" in
-      *@cockpit-nvim-pane*) echo "${MARKED:-}" ;;
+      *@cockpit-nvim-window*) echo "${MARKED:-}" ;;
       *@cockpit-nvim-command*) echo "${NVIM_CMD:-}" ;;
+      *@cockpit-nvim-name*) echo "" ;;
       *@cockpit-root*) echo "${ROOT_OPT:-}" ;;
       *) echo "" ;;
     esac ;;
-  list-panes) printf '%b' "${PANES:-}" ;;
-  split-window) echo "%9" ;;
+  list-windows) printf '%b' "${WINS:-}" ;;
+  new-window) echo "@9" ;;
   *) : ;;
 esac
 exit 0
@@ -49,25 +49,25 @@ fail() { printf 'not ok - %s\n  log:\n%s\n' "$1" "$(cat "$LOG" 2>/dev/null)" >&2
 run() { : >"$LOG"; PATH="$TMPDIR/bin:$PATH" TMUX="fake" "$ROOT/scripts/nvim-toggle.sh"; }
 logged() { grep -q "$1" "$LOG"; }
 
-# --- in the editor pane (marked) -> go back to the previous pane --------
-MARKED=1 CUR_CMD=bash run >/dev/null 2>&1 || fail "toggle-back exited non-zero"
-logged "last-pane -t @1" || fail "expected 'last-pane' when in the nvim pane"
+# --- in the editor window (tagged) -> go back to the previous window ----
+MARKED=1 WIN_NAME=bash run >/dev/null 2>&1 || fail "toggle-back exited non-zero"
+logged "last-window -t proj" || fail "expected 'last-window' when in the nvim window"
 
-# --- in the editor pane (detected by command) -> go back ----------------
-MARKED="" CUR_CMD=nvim run >/dev/null 2>&1 || fail "toggle-back (by cmd) failed"
-logged "last-pane -t @1" || fail "expected 'last-pane' when current command is nvim"
+# --- in the editor window (detected by name) -> go back -----------------
+MARKED="" WIN_NAME=nvim run >/dev/null 2>&1 || fail "toggle-back (by name) failed"
+logged "last-window -t proj" || fail "expected 'last-window' when window name is nvim"
 
-# --- a normal pane with an existing nvim pane -> focus it ---------------
-MARKED="" CUR_CMD=bash PANES=$'%4\t\tbash\n%7\t1\tnvim\n' run >/dev/null 2>&1 \
-  || fail "focus-existing failed"
-logged "select-pane -t %7" || fail "expected focus of existing nvim pane %7"
-if logged "split-window"; then fail "should not split when an nvim pane exists"; fi
+# --- a normal window with an existing nvim window -> switch to it -------
+MARKED="" WIN_NAME=bash WINS=$'@1\t\tbash\n@4\t1\tnvim\n' run >/dev/null 2>&1 \
+  || fail "switch-existing failed"
+logged "select-window -t @4" || fail "expected switch to existing nvim window @4"
+if logged "new-window"; then fail "should not create a window when one exists"; fi
 
-# --- a normal pane, no nvim pane -> create one at the project root ------
-ROOT_OPT="$HOME" MARKED="" CUR_CMD=bash PANES=$'%4\t\tbash\n' run >/dev/null 2>&1 \
-  || fail "create-pane failed"
-logged "split-window" || fail "expected split-window to create the nvim pane"
-logged "@cockpit-nvim-pane 1" || fail "new pane should be tagged"
-logged "select-pane -t %9 -T nvim" || fail "new pane should be titled nvim"
+# --- a normal window, no nvim window -> create one at the project root --
+ROOT_OPT="$HOME" MARKED="" WIN_NAME=bash WINS=$'@1\t\tbash\n' run >/dev/null 2>&1 \
+  || fail "create-window failed"
+logged "new-window" || fail "expected new-window to create the nvim window"
+logged "@cockpit-nvim-window 1" || fail "new window should be tagged"
+logged "automatic-rename off" || fail "new window should keep a stable name"
 
 printf 'ok - nvim\n'
