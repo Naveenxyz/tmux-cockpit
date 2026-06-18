@@ -21,6 +21,13 @@ popup_title="$(get_opt "@cockpit-popup-title" " projects ")"
 
 tmux bind-key "$popup_key" display-popup -w "$popup_width" -h "$popup_height" -T "$popup_title" -E "'$SCRIPTS/picker.sh'"
 
+# Manage popup: list and prune every worktree/feature under the worktrees
+# dir. Capital 'O' by convention (lowercase 'o' opens projects).
+manage_key="$(get_opt "@cockpit-manage-key" "O")"
+if [ -n "$manage_key" ]; then
+  tmux bind-key "$manage_key" display-popup -w "$popup_width" -h "$popup_height" -T ' manage ' -E "'$SCRIPTS/manage-picker.sh'"
+fi
+
 # Agent popup: AI-agent panes with live previews, ordered by project.
 # prefix+a = all sessions, prefix+A = current session only.
 # Disable: @cockpit-agents-popup off

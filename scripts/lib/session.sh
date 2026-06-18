@@ -252,6 +252,41 @@ current_session() {
   fi
 }
 
+# Cockpit sessions rooted at or under <dir>, one per line, with an attached
+# flag:  <name>\t<0|1>. Matches on the recorded @cockpit-root so only
+# cockpit-owned sessions are considered.
+sessions_under() {
+  local dir="$1" name root
+  dir="${dir%/}"
+  [ -n "$dir" ] || return 0
+  while IFS=$'\t' read -r name root; do
+    [ -n "$name" ] || continue
+    case "$root" in
+      "$dir" | "$dir"/*)
+        printf '%s\t%s\n' "$name" \
+          "$(tmux display-message -p -t "=$name" '#{?session_attached,1,0}' 2>/dev/null)"
+        ;;
+    esac
+  done < <(tmux list-sessions -F $'#{session_name}\t#{@cockpit-root}' 2>/dev/null)
+}
+
+# Kill detached cockpit sessions rooted at or under <dir> (exact-name kills
+# only). Attached sessions are left running; their names are returned in
+# ATTACHED_SESSIONS so callers can warn or refuse.
+# shellcheck disable=SC2034
+kill_sessions_under() {
+  local dir="$1" name att
+  ATTACHED_SESSIONS=""
+  while IFS=$'\t' read -r name att; do
+    [ -n "$name" ] || continue
+    if [ "$att" = "1" ]; then
+      ATTACHED_SESSIONS="$ATTACHED_SESSIONS $name"
+    else
+      tmux kill-session -t "=$name" 2>/dev/null || true
+    fi
+  done < <(sessions_under "$dir")
+}
+
 # The project root of a session: @cockpit-root if recorded, else the
 # session's path.
 session_path_of() {

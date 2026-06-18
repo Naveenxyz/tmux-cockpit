@@ -43,8 +43,18 @@ feature_dir="$(features_base)/$name"
 mode="$(feature_mode)"
 
 # Recreate cleanly when the feature already exists: warn, give a moment to
-# bail, then drop the old folder and its sessions.
+# bail, then drop the old folder and its sessions. Refuse while a session
+# rooted in it is attached — deleting its cwd out from under a live client is
+# exactly the surprise prune.sh guards against.
 if [ -e "$feature_dir" ]; then
+  attached=""
+  while IFS=$'\t' read -r sname satt; do
+    [ "$satt" = "1" ] && attached="$attached $sname"
+  done < <(sessions_under "$feature_dir")
+  if [ -n "$attached" ]; then
+    cockpit_error "feature '$name' has attached session(s):$attached — detach first"
+    exit 1
+  fi
   printf '\033[33m! recreating feature\033[0m %s — removing the old folder and its sessions\n' \
     "$(display_path "$feature_dir")"
   sleep 1.2

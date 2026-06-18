@@ -53,11 +53,24 @@ feature_mode() {
   esac
 }
 
-# Tear down an existing feature: kill any cockpit sessions rooted at or under
-# the feature folder (exact-name kills only), then remove the folder. As a
-# safety measure this refuses to touch anything outside features_base.
+# The main (top-level) repo for any worktree/clone path: the first entry of
+# `git worktree list`, which git always reports as the main worktree. Prints
+# nothing and returns non-zero if <path> is not inside a git repo.
+worktree_main_repo() {
+  local path="$1" main
+  main="$(git -C "$path" worktree list --porcelain 2>/dev/null \
+    | awk '/^worktree /{print substr($0, 10); exit}')"
+  [ -n "$main" ] || return 1
+  printf '%s' "$main"
+}
+
+# Tear down an existing feature: kill cockpit sessions rooted at or under the
+# feature folder, deregister any worktree-mode repos from their source repos
+# (a plain `rm -rf` would leave dangling worktree registrations behind), then
+# remove the folder. As a safety measure this refuses to touch anything
+# outside features_base.
 remove_feature() {
-  local dir="$1" base name root
+  local dir="$1" base sub main mains
   dir="${dir%/}"
   base="$(features_base)"
   case "$dir" in
@@ -65,14 +78,46 @@ remove_feature() {
     *) return 1 ;;
   esac
 
-  while IFS=$'\t' read -r name root; do
-    [ -n "$name" ] || continue
-    case "$root" in
-      "$dir" | "$dir"/*) tmux kill-session -t "=$name" 2>/dev/null || true ;;
-    esac
-  done < <(tmux list-sessions -F $'#{session_name}\t#{@cockpit-root}' 2>/dev/null)
+  kill_sessions_under "$dir"
+
+  # Deregister worktree-mode repos before deleting the folder. A linked
+  # worktree has .git as a FILE (a gitdir pointer); a fresh clone has a .git
+  # DIR and is independent, so there is nothing to deregister.
+  mains=$'\n'
+  if [ -d "$dir" ]; then
+    for sub in "$dir"/*/; do
+      sub="${sub%/}"
+      [ -d "$sub" ] && [ -f "$sub/.git" ] || continue
+      main="$(worktree_main_repo "$sub")" || continue
+      git -C "$main" worktree remove --force "$sub" 2>/dev/null || true
+      case "$mains" in
+        *$'\n'"$main"$'\n'*) ;;
+        *) mains="$mains$main"$'\n' ;;
+      esac
+    done
+  fi
 
   rm -rf "$dir"
+
+  # Prune any registrations that survived a failed `worktree remove`.
+  while IFS= read -r main; do
+    [ -n "$main" ] && git -C "$main" worktree prune 2>/dev/null || true
+  done <<< "$mains"
+}
+
+# After removing a worktree, drop its repo-group folder
+# (<worktrees>/<repo-slug>/) when no worktrees remain in it — leaving only
+# the .cockpit-repo marker behind would be clutter.
+cleanup_empty_repo_group() {
+  local wt="$1" parent
+  parent="$(dirname "${wt%/}")"
+  [ -f "$parent/.cockpit-repo" ] || return 0
+  # Any sibling worktree directories still present? Then keep the group.
+  if [ -n "$(find "$parent" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -1)" ]; then
+    return 0
+  fi
+  rm -f "$parent/.cockpit-repo"
+  rmdir "$parent" 2>/dev/null || true
 }
 
 # Copy local, often-gitignored files from <src> into <dest>, preserving

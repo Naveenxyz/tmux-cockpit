@@ -121,6 +121,38 @@ cockpit -f checkout-flow api web   # create it from resolved repos directly
 > to `ctrl-f` ("feature"). Rebind it by editing the `ctrl-f` line in
 > `scripts/picker.sh`.
 
+### Manage worktrees & features — `prefix + O`
+
+One place to see and clean up everything cockpit has created under
+`@cockpit-worktrees-dir`:
+
+- every git worktree (grouped by repo) and every multi-repo feature
+- `enter` / `1`-`9` / click — open the entry as a project session
+- `ctrl-x` — **prune** the selected worktree or feature
+
+Pruning is the proper teardown, not a blind `rm`:
+
+- **worktrees** — kills the worktree's cockpit sessions, runs
+  `git worktree remove` (so the source repo is left consistent), prunes any
+  stale registration, and removes the now-empty repo group folder. If the
+  worktree has uncommitted changes git refuses; you are then asked to
+  force-remove (which discards them).
+- **features** — kills the feature's sessions, and for `worktree`-mode
+  features deregisters each repo from its source (`git worktree remove` +
+  `git worktree prune`) before deleting the folder, so no dangling worktrees
+  are left behind. Clone-mode features are independent and simply removed.
+
+Pruning always asks for confirmation first, and refuses while a session
+rooted in the target is still **attached** — detach it first.
+
+```sh
+cockpit -W                         # open the manage picker
+cockpit . -w --rm fix-popup        # prune one worktree of the current repo
+cockpit api -w --rm review/readme  # resolve api, then prune that worktree
+cockpit -f --rm checkout-flow      # prune a whole feature
+cockpit -f --rm checkout-flow -y   # ...without the confirmation prompt
+```
+
 ### Agent picker — `prefix + a`
 
 List AI-agent panes across all sessions with live previews:
@@ -178,16 +210,26 @@ Worktrees:
   cockpit <query> -w <branch>     Same, after resolving query/path to a repo
   cockpit . -w <branch> --path <dir>
                                   Create at a custom path if it does not exist
+  cockpit . -w --rm <branch>      Prune the worktree for <branch>
+  cockpit <query> -w --rm <branch>   Same, after resolving query/path to a repo
 
 Features (multi-repo):
   cockpit -f                      Feature picker (name it, then select repos)
   cockpit -f <name>               Feature picker with the name pre-filled
   cockpit -f <name> <repo>...     Create feature <name> from the given repos
                                   (each <repo> is a path or a zoxide query)
+  cockpit -f --rm <name>          Prune feature <name>
+
+Manage:
+  cockpit -W                      Manage picker: list/open/prune worktrees
+                                  and features (prefix + O in tmux)
 
 Options:
   -w, --worktree                  Use git worktree mode
   -f, --feature                   Use multi-repo feature mode
+  -W, --manage                    Open the manage picker
+  --rm                            Prune the selected worktree/feature
+  -y, --yes                       Skip the prune confirmation prompt
   --path <dir>                    Custom worktree destination for -w <branch>
   -h, --help                      Show this help
 ```
@@ -260,6 +302,9 @@ set -g @cockpit-agents-height '65%'
 # Worktrees
 set -g @cockpit-worktrees-dir '~/worktrees'
 
+# Manage picker (list/prune worktrees and features)
+set -g @cockpit-manage-key 'O'
+
 # Multi-repo features (ctrl-f in the project picker)
 # 'clone' (default): fresh clone per repo, new branch from main
 # 'worktree': lightweight git worktree per repo
@@ -294,6 +339,10 @@ set -g @cockpit-auto-commands 'claude:claude;pi:pi'
 - `scripts/repo-list.sh`, `scripts/feature-picker.sh`, and
   `scripts/open-feature.sh` drive multi-repo features: pick git repos, then
   clone (or worktree) each under `features/<name>` and copy in `.env` files.
+- `scripts/manage-list.sh`, `scripts/manage-picker.sh`, and
+  `scripts/prune.sh` power the manage picker: list every worktree/feature
+  under the worktrees dir, and prune one by killing its sessions and running
+  the right git teardown (`git worktree remove`/`prune`) before deleting it.
 - `scripts/agent-list.sh` finds agent panes by walking pane process trees from a
   single `ps` snapshot.
 - `scripts/helpers.sh` is a thin loader for `scripts/lib/` — `util.sh` (options,
@@ -318,6 +367,10 @@ CI runs syntax checks, ShellCheck, and the test suite.
   duplicate.
 - Keys and popup size are read when the plugin loads; changing them requires a
   tmux config reload. Most other options apply live.
+- The manage picker (`prefix + O`) lists worktrees and features under
+  `@cockpit-worktrees-dir`. Worktrees created with a custom `-w --path`
+  outside that directory are not tracked there, so they are not listed; remove
+  them with `cockpit <repo> -w --rm <branch>` or plain `git worktree remove`.
 
 ## License
 

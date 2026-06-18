@@ -29,16 +29,27 @@ Worktrees:
   cockpit <query> -w <branch>     Same, after resolving query/path to a repo
   cockpit . -w <branch> --path <dir>
                                   Create at a custom path if it does not exist
+  cockpit . -w --rm <branch>      Prune the worktree for <branch> (kill sessions,
+  cockpit <query> -w --rm <branch>   git worktree remove, clean up)
 
 Features (multi-repo):
   cockpit -f                      Feature picker (name it, then select repos)
   cockpit -f <name>               Feature picker with the name pre-filled
   cockpit -f <name> <repo>...     Create feature <name> from the given repos
                                   (each <repo> is a path or a zoxide query)
+  cockpit -f --rm <name>          Prune feature <name> (kill sessions, deregister
+                                  worktrees, remove the folder)
+
+Manage:
+  cockpit -W                      Manage picker: list/open/prune all worktrees
+                                  and features (prefix + O in tmux)
 
 Options:
   -w, --worktree                  Use git worktree mode
   -f, --feature                   Use multi-repo feature mode
+  -W, --manage                    Open the manage picker
+  --rm                            Prune the selected worktree/feature
+  -y, --yes                       Skip the prune confirmation prompt
   --path <dir>                    Custom worktree destination for -w <branch>
   -h, --help                      Show this help
 
@@ -49,8 +60,11 @@ Examples:
   cockpit -w
   cockpit . -w fix-agent-popup
   cockpit tmux-cockpit -w review/readme --path ~/Desktop/review-readme
+  cockpit . -w --rm fix-agent-popup
   cockpit -f checkout-flow
   cockpit -f checkout-flow api web payments
+  cockpit -f --rm checkout-flow
+  cockpit -W
 EOF
 }
 
@@ -83,6 +97,9 @@ fi
 
 worktree_mode=""
 feature_mode_flag=""
+manage_mode=""
+rm_flag=""
+yes_flag=""
 path_arg=""
 before=()
 after=()
@@ -103,6 +120,18 @@ while [ "$#" -gt 0 ]; do
     -f|--feature)
       feature_mode_flag=1
       seen_feature=1
+      shift
+      ;;
+    -W|--manage)
+      manage_mode=1
+      shift
+      ;;
+    --rm)
+      rm_flag=1
+      shift
+      ;;
+    -y|--yes)
+      yes_flag=1
       shift
       ;;
     --path)
@@ -127,11 +156,30 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+# `cockpit -W` / `--manage` — the worktree/feature manage picker.
+if [ -n "$manage_mode" ]; then
+  exec "$ROOT/scripts/manage-picker.sh"
+fi
+
+# --rm only means something in worktree (-w) or feature (-f) mode.
+if [ -n "$rm_flag" ] && [ -z "$worktree_mode" ] && [ -z "$feature_mode_flag" ]; then
+  echo "cockpit: --rm requires -w (worktree) or -f (feature)" >&2
+  exit 2
+fi
+
 # Multi-repo feature: `cockpit -f` (interactive picker), `cockpit -f <name>`
 # (picker with the name pre-filled), or `cockpit -f <name> <repo>...` to
 # create it non-interactively. Each <repo> is resolved like a project arg
 # (a path, or a single zoxide query).
 if [ -n "$feature_mode_flag" ]; then
+  # `cockpit -f --rm <name>` — prune a feature by name.
+  if [ -n "$rm_flag" ]; then
+    if [ "${#feat[@]}" -eq 0 ]; then
+      echo "cockpit: -f --rm needs a feature name" >&2
+      exit 2
+    fi
+    exec env ${yes_flag:+COCKPIT_YES=1} "$ROOT/scripts/prune.sh" --feature "${feat[0]}"
+  fi
   if [ "${#feat[@]}" -le 1 ]; then
     exec "$ROOT/scripts/feature-picker.sh" "${feat[@]}"
   fi
@@ -151,6 +199,14 @@ if [ -n "$worktree_mode" ]; then
     before=(.)
   fi
   repo_path="$(resolve_project_arg "${before[@]}")" || exit 1
+  # `cockpit -w --rm <branch>` — prune a worktree of this repo.
+  if [ -n "$rm_flag" ]; then
+    if [ "${#after[@]}" -eq 0 ]; then
+      echo "cockpit: -w --rm needs a branch/worktree name" >&2
+      exit 2
+    fi
+    exec env ${yes_flag:+COCKPIT_YES=1} "$ROOT/scripts/prune.sh" --worktree "$repo_path" "${after[0]}"
+  fi
   if [ "${#after[@]}" -eq 0 ]; then
     exec "$ROOT/scripts/worktree-picker.sh" "D:$repo_path"
   fi

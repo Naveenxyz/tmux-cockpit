@@ -12,6 +12,7 @@ done
 "$ROOT/tests/test-agents.sh"
 "$ROOT/tests/test-project-list.sh"
 "$ROOT/tests/test-feature.sh"
+"$ROOT/tests/test-prune.sh"
 "$ROOT/tests/test-tmux-smoke.sh"
 
 printf 'ok - all tests\n'

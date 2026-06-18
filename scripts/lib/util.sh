@@ -76,14 +76,17 @@ resolve_typed_dir() {
 }
 
 # List entries carry a typed target in field 1: "S:<session>" for open
-# sessions, "D:<path>" for directories. Parse one into TARGET_KIND
-# (session|dir) and TARGET_VALUE; a bare path is treated as a directory.
-# Consumers read TARGET_KIND/TARGET_VALUE after calling.
+# sessions, "D:<path>" for directories, and "W:<path>" / "F:<path>" for the
+# manage picker's worktrees and features (both directory paths). Parse one
+# into TARGET_KIND (session|dir) and TARGET_VALUE; a bare path is treated as
+# a directory. Consumers read TARGET_KIND/TARGET_VALUE after calling.
 # shellcheck disable=SC2034
 parse_target() {
   case "$1" in
     S:*) TARGET_KIND=session TARGET_VALUE="${1#S:}" ;;
     D:*) TARGET_KIND=dir     TARGET_VALUE="${1#D:}" ;;
+    W:*) TARGET_KIND=dir     TARGET_VALUE="${1#W:}" ;;
+    F:*) TARGET_KIND=dir     TARGET_VALUE="${1#F:}" ;;
     *)   TARGET_KIND=dir     TARGET_VALUE="$1" ;;
   esac
 }
