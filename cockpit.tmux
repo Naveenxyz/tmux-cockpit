@@ -52,6 +52,13 @@ if [ "$(get_opt "@cockpit-lazygit" "on")" = "on" ]; then
   tmux bind-key "$lazygit_key" run-shell "'$SCRIPTS/lazygit-popup.sh'"
 fi
 
+# nvim editor toggle pane (prefix + v): focus/create the window's nvim pane,
+# or jump back when already in it. Disable: @cockpit-nvim off
+if [ "$(get_opt "@cockpit-nvim" "on")" = "on" ]; then
+  nvim_key="$(get_opt "@cockpit-nvim-key" "v")"
+  tmux bind-key "$nvim_key" run-shell "'$SCRIPTS/nvim-toggle.sh'"
+fi
+
 # Previous-session key (like cd -). Off by default: most candidate keys
 # (e.g. 'p' = previous-window) collide with stock tmux bindings, so users
 # opt in: set -g @cockpit-last-key 'p'
