@@ -61,7 +61,7 @@ for group in "$base"/*/; do
 
   for wt in "$group"/*/; do
     wt="${wt%/}"
-    [ -d "$wt" ] && [ -e "$wt/.git" ] || continue
+    if [ ! -d "$wt" ] || [ ! -e "$wt/.git" ]; then continue; fi
     branch="$(git -C "$wt" branch --show-current 2>/dev/null)"
     [ -n "$branch" ] || branch="${wt##*/}"
     printf 'W:%s\t\033[2mwktr\033[0m \033[32m●\033[0m %-26s \033[2m%s\033[0m%s\n' \

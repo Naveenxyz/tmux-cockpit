@@ -87,7 +87,7 @@ remove_feature() {
   if [ -d "$dir" ]; then
     for sub in "$dir"/*/; do
       sub="${sub%/}"
-      [ -d "$sub" ] && [ -f "$sub/.git" ] || continue
+      if [ ! -d "$sub" ] || [ ! -f "$sub/.git" ]; then continue; fi
       main="$(worktree_main_repo "$sub")" || continue
       git -C "$main" worktree remove --force "$sub" 2>/dev/null || true
       case "$mains" in
@@ -101,7 +101,9 @@ remove_feature() {
 
   # Prune any registrations that survived a failed `worktree remove`.
   while IFS= read -r main; do
-    [ -n "$main" ] && git -C "$main" worktree prune 2>/dev/null || true
+    if [ -n "$main" ]; then
+      git -C "$main" worktree prune 2>/dev/null || true
+    fi
   done <<< "$mains"
 }
 

@@ -135,7 +135,10 @@ case "${1:-}" in
     shift
     repo="${1:-}"
     branch="${2:-}"
-    [ -n "$repo" ] && [ -n "$branch" ] || { cockpit_error "--worktree needs <repo> <branch>"; exit 2; }
+    if [ -z "$repo" ] || [ -z "$branch" ]; then
+      cockpit_error "--worktree needs <repo> <branch>"
+      exit 2
+    fi
     repo="$(git_repo_for_path "$repo")" || { cockpit_error "not a git repo: $repo"; exit 1; }
     wt="$(worktree_for_branch "$repo" "$branch")"
     [ -n "$wt" ] || { cockpit_error "no worktree for branch '$branch' in $(display_path "$repo")"; exit 1; }
