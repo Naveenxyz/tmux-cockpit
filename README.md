@@ -375,7 +375,16 @@ tests/run.sh
 shellcheck -e SC1090,SC1091 cockpit.tmux bin/cockpit scripts/*.sh scripts/lib/*.sh scripts/agents/*.sh tests/*.sh
 ```
 
-CI runs syntax checks, ShellCheck, and the test suite.
+CI runs two jobs: a Linux job (ShellCheck + the suite) and a macOS job that
+runs the suite under the system **bash 3.2**, so the bash-3.2 compatibility the
+scripts rely on is actually verified.
+
+To reproduce the bash-3.2 run locally on macOS:
+
+```sh
+shim="$(mktemp -d)"; ln -sf /bin/bash "$shim/bash"
+PATH="$shim:$PATH" tests/run.sh   # #!/usr/bin/env bash now resolves to 3.2
+```
 
 ## Known limitations
 

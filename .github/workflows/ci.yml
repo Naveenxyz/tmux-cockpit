@@ -5,7 +5,9 @@ on:
   pull_request:
 
 jobs:
-  test:
+  # Linux job: the ShellCheck authority (apt's shellcheck is stricter) plus a
+  # run of the suite. Runs under the runner's modern bash.
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,5 +22,35 @@ jobs:
           done
       - name: ShellCheck
         run: shellcheck -e SC1090,SC1091 cockpit.tmux bin/cockpit scripts/*.sh scripts/lib/*.sh scripts/agents/*.sh tests/*.sh
+      - name: Tests
+        run: tests/run.sh
+
+  # macOS job: the real reason this matters. The scripts target bash 3.2
+  # (macOS's system bash), so run the suite under it. A shim makes
+  # `#!/usr/bin/env bash` resolve to /bin/bash (3.2) for every script.
+  bash32-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: brew install tmux
+      - name: Pin /usr/bin/env bash to system bash 3.2
+        run: |
+          mkdir -p "$HOME/bin32"
+          ln -sf /bin/bash "$HOME/bin32/bash"
+          echo "$HOME/bin32" >> "$GITHUB_PATH"
+      - name: Verify bash is 3.2
+        run: |
+          bash --version | head -1
+          version="$(bash -c 'echo "$BASH_VERSION"')"
+          case "$version" in
+            3.2*) echo "ok: bash $version" ;;
+            *) echo "expected bash 3.2, got $version"; exit 1 ;;
+          esac
+      - name: Syntax check
+        run: |
+          for file in cockpit.tmux bin/cockpit scripts/*.sh scripts/lib/*.sh scripts/agents/*.sh tests/*.sh; do
+            bash -n "$file"
+          done
       - name: Tests
         run: tests/run.sh
